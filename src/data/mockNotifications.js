@@ -1,0 +1,42 @@
+export const mockNotifications = [
+  {
+    id: 1,
+    type: "payment_overdue",
+    message: "Paiement en retard — Yacine Ahmed (Novembre 2025)",
+    date: "2025-11-05",
+    read: false,
+    link: "/creche/enfants/1",
+  },
+  {
+    id: 2,
+    type: "absence_threshold",
+    message: "Omar Cherif a atteint 3 absences non justifiées ce mois",
+    date: "2025-11-06",
+    read: false,
+    link: "/creche/enfants/3",
+  },
+  {
+    id: 3,
+    type: "contract_expiry",
+    message: "Le contrat de Amine Belkacem expire dans 90 jours",
+    date: "2025-11-10",
+    read: false,
+    link: "/creche/hr/2",
+  },
+  {
+    id: 4,
+    type: "payment_overdue",
+    message: "Paiement en retard — Omar Cherif (Novembre 2025)",
+    date: "2025-11-04",
+    read: true,
+    link: "/creche/enfants/3",
+  },
+  {
+    id: 5,
+    type: "reminder_sent",
+    message: "Rappel de paiement envoyé à Yacine Ahmed",
+    date: "2025-11-05",
+    read: true,
+    link: "/creche/payments/rappels",
+  },
+];

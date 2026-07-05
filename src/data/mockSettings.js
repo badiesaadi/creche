@@ -1,0 +1,20 @@
+export const mockSettings = {
+  nom: "Crèche PAI Mostaganem",
+  adresse: "12 Rue des Fleurs, Mostaganem",
+  telephone: "045123456",
+  email: "contact@pai-mosta.dz",
+  tarifMensuel: 8000,
+  tarifInscription: 2000,
+  seuilGroupe: 15,
+  heureOuverture: "07:30",
+  heureFermeture: "17:30",
+  delaiRelance: 7,
+  typesAbsence: ["Maladie", "Familiale", "Sans motif", "Médical", "Autre"],
+  criteresEvaluation: [
+    "Langage et communication",
+    "Motricité fine",
+    "Motricité globale",
+    "Autonomie",
+    "Socialisation",
+  ],
+};

@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+body {
+  font-family: 'Cairo', sans-serif;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    inset: 0;
+    padding: 40px;
+  }
+  @page {
+    margin: 20mm;
+  }
+}
