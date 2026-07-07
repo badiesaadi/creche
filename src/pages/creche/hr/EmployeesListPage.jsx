@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockEmployees } from "../../../data/mockEmployees.js";
+import { fetchEmployees } from "../../../lib/api/employees.js";
 import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 
 const statusStyles = {
@@ -16,9 +16,17 @@ export default function EmployeesListPage() {
   const { user } = useAuth();
   const isManager = user?.role === "manager";
 
-  // TODO: replace with real API call -> apiClient.get("/employees")
-  const [employees] = useState(mockEmployees);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetchEmployees()
+      .then(setEmployees)
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [t]);
 
   const filtered = employees.filter((e) =>
     e.nom.toLowerCase().includes(search.toLowerCase())
@@ -37,6 +45,9 @@ export default function EmployeesListPage() {
           </button>
         )}
       </div>
+
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+      {loading && <p className="text-gray-400 text-sm">{t("common.loading")}</p>}
 
       <input
         type="text"

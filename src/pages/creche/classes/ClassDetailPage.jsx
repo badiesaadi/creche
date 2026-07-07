@@ -1,39 +1,74 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockClasses } from "../../../data/mockClasses.js";
-import { mockChildren } from "../../../data/mockChildren.js";
+import { fetchGroup, fetchClass, assignChildToGroup, removeChildFromGroup, splitClass, deleteClass } from "../../../lib/api/classes.js";
+import { fetchChildren } from "../../../lib/api/children.js";
+import { unassignEmployeeGroup } from "../../../lib/api/employees.js";
+import { recordBulkAbsences } from "../../../lib/api/absences.js";
+import { fetchGroupEvaluations, createEvaluation } from "../../../lib/api/evaluations.js";
 import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 
 const tabs = ["children", "attendance", "evaluations"];
 
 export default function ClassDetailPage() {
-  const { id } = useParams();
+  const { id } = useParams(); // this is a Group id — groups are what hold children in the real backend
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { user } = useAuth();
   const isManager = user?.role === "manager";
   const [activeTab, setActiveTab] = useState(isManager ? "children" : "attendance");
 
-  const classData = mockClasses.find((c) => String(c.id) === id);
-  const [assignedIds, setAssignedIds] = useState(classData?.enfantIds || []);
+  const [group, setGroup] = useState(null);
+  const [classInfo, setClassInfo] = useState(null);
+  const [allChildren, setAllChildren] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showAddPanel, setShowAddPanel] = useState(false);
 
-  // Attendance state — today's roll call
   const today = new Date().toISOString().slice(0, 10);
-  const [attendance, setAttendance] = useState(() =>
-    (classData?.enfantIds || []).reduce((acc, cid) => ({ ...acc, [cid]: "present" }), {})
-  );
+  const [attendance, setAttendance] = useState({});
   const [attendanceSaved, setAttendanceSaved] = useState(false);
 
-  // Evaluations state
   const [evaluations, setEvaluations] = useState([]);
   const [evalForm, setEvalForm] = useState({ childId: "", domaine: "", note: "", date: today });
   const [showEvalForm, setShowEvalForm] = useState(false);
 
-  if (!classData) {
+  useEffect(() => {
+    setLoading(true);
+    fetchGroup(id)
+      .then(async (g) => {
+        setGroup(g);
+        setAttendance(g.enfantIds.reduce((acc, cid) => ({ ...acc, [cid]: "present" }), {}));
+        const [cls, children, evals] = await Promise.all([
+          g.classId ? fetchClass(g.classId).catch(() => null) : null,
+          fetchChildren().catch(() => []),
+          fetchGroupEvaluations(id).catch(() => []),
+        ]);
+        setClassInfo(cls);
+        setAllChildren(children);
+        setEvaluations(
+          (Array.isArray(evals) ? evals : evals.items || []).map((e) => ({
+            id: e.id,
+            childId: e.childId,
+            childName: e.childName || "",
+            domaine: e.criteria || e.domaine,
+            date: e.period || e.date,
+            note: e.score || e.note,
+          }))
+        );
+      })
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [id, t]);
+
+  if (loading) {
+    return <p className="text-gray-400 text-sm">{t("common.loading")}</p>;
+  }
+
+  if (error || !group) {
     return (
       <div className="text-center py-12">
+        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2 mb-3 inline-block">{error}</p>}
         <p className="text-gray-500">{t("classes.notFound")}</p>
         <button onClick={() => navigate("/creche/classes")} className="mt-3 text-teal-600 hover:underline text-sm">
           ← {t("common.cancel")}
@@ -42,84 +77,163 @@ export default function ClassDetailPage() {
     );
   }
 
-  const assignedChildren = mockChildren.filter((c) => assignedIds.includes(c.id));
-  const unassignedChildren = mockChildren.filter((c) => !assignedIds.includes(c.id) && c.statut === "actif");
-  const count = assignedIds.length;
-  const isOverThreshold = count > classData.seuilMax;
-  const isNearFull = count >= classData.seuilMax * 0.85 && !isOverThreshold;
+  const assignedChildren = allChildren.filter((c) => group.enfantIds.includes(c.id));
+  const unassignedChildren = allChildren.filter((c) => !group.enfantIds.includes(c.id) && c.statut === "actif");
+  const count = group.enfantIds.length;
+  const isOverThreshold = count > group.seuilMax;
+  const isNearFull = count >= group.seuilMax * 0.85 && !isOverThreshold;
 
-  function handleAddChild(childId) {
-    setAssignedIds((prev) => [...prev, childId]);
-    setAttendance((prev) => ({ ...prev, [childId]: "present" }));
+  async function handleAddChild(childId) {
+    try {
+      await assignChildToGroup(id, childId);
+      setGroup((prev) => ({ ...prev, enfantIds: [...prev.enfantIds, childId] }));
+      setAttendance((prev) => ({ ...prev, [childId]: "present" }));
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
   }
-  function handleRemoveChild(childId) {
-    setAssignedIds((prev) => prev.filter((cid) => cid !== childId));
+
+  async function handleRemoveChild(childId) {
+    try {
+      await removeChildFromGroup(id, childId);
+      setGroup((prev) => ({ ...prev, enfantIds: prev.enfantIds.filter((cid) => cid !== childId) }));
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
   }
+
   function toggleAttendance(childId) {
     setAttendance((prev) => ({ ...prev, [childId]: prev[childId] === "present" ? "absent" : "present" }));
     setAttendanceSaved(false);
   }
-  function handleSaveAttendance() {
-    // TODO: real API call -> apiClient.post(`/classes/${id}/attendance`, { date: today, attendance })
-    console.log("Attendance saved (mock):", { date: today, attendance });
-    setAttendanceSaved(true);
+
+  async function handleSaveAttendance() {
+    const absentIds = Object.entries(attendance).filter(([, v]) => v === "absent").map(([cid]) => cid);
+    try {
+      await recordBulkAbsences(id, today, absentIds);
+      setAttendanceSaved(true);
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
   }
-  function handleAddEval(e) {
+
+  async function handleSplitClass() {
+    if (!classInfo?.id) return;
+    setError("");
+    try {
+      await splitClass(classInfo.id);
+      window.location.reload();
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
+  }
+
+  async function handleDeleteClass() {
+    if (!classInfo?.id) return;
+    if (!window.confirm(t("classes.confirmDelete"))) return;
+    setError("");
+    try {
+      await deleteClass(classInfo.id);
+      navigate("/creche/classes");
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
+  }
+
+  async function handleUnassignTeacher() {
+    if (!group.enseignantId) return;
+    setError("");
+    try {
+      await unassignEmployeeGroup(group.enseignantId, id);
+      setGroup((prev) => ({ ...prev, enseignant: null, enseignantId: null }));
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
+  }
+
+  async function handleAddEval(e) {
     e.preventDefault();
     if (!evalForm.childId || !evalForm.domaine.trim() || !evalForm.note.trim()) return;
     const child = assignedChildren.find((c) => String(c.id) === evalForm.childId);
-    // TODO: real API call -> apiClient.post(`/evaluations`, evalForm)
-    setEvaluations((prev) => [...prev, {
-      id: Date.now(),
-      childId: Number(evalForm.childId),
-      childName: child ? `${child.prenom} ${child.nom}` : "",
-      domaine: evalForm.domaine,
-      note: evalForm.note,
-      date: evalForm.date,
-      evaluePar: user?.nom || "Enseignante",
-    }]);
-    setEvalForm({ childId: "", domaine: "", note: "", date: today });
-    setShowEvalForm(false);
+    try {
+      await createEvaluation({
+        childId: evalForm.childId,
+        period: evalForm.date,
+        criteria: evalForm.domaine,
+        score: evalForm.note,
+        comment: "",
+      });
+      setEvaluations((prev) => [...prev, {
+        id: Date.now(),
+        childId: evalForm.childId,
+        childName: child ? `${child.prenom} ${child.nom}` : "",
+        domaine: evalForm.domaine,
+        note: evalForm.note,
+        date: evalForm.date,
+      }]);
+      setEvalForm({ childId: "", domaine: "", note: "", date: today });
+      setShowEvalForm(false);
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
   }
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate("/creche/classes")} className="text-gray-400 hover:text-gray-600">←</button>
           <div>
-            <h1 className="text-xl font-bold text-gray-800">{classData.nom}</h1>
-            <p className="text-sm text-gray-500">{classData.tranche} · {classData.enseignant}</p>
+            <h1 className="text-xl font-bold text-gray-800">{classInfo?.nom ? `${classInfo.nom} — ` : ""}{group.nom}</h1>
+            <p className="text-sm text-gray-500">
+              {classInfo?.tranche} · {group.enseignant || "—"}
+              {isManager && group.enseignantId && (
+                <button onClick={handleUnassignTeacher} className="ms-2 text-xs text-red-500 hover:underline">
+                  {t("classes.unassignTeacher")}
+                </button>
+              )}
+            </p>
           </div>
         </div>
         {isManager && (
-          <button onClick={() => navigate(`/creche/classes/${id}/modifier`)}
-            className="w-full sm:w-auto px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
-            {t("classes.editClass")}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button onClick={() => navigate(`/creche/classes/${id}/modifier`)}
+              className="w-full sm:w-auto px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
+              {t("classes.editClass")}
+            </button>
+            {isOverThreshold && (
+              <button onClick={handleSplitClass}
+                className="w-full sm:w-auto px-4 py-2 rounded-md border border-yellow-300 text-yellow-700 text-sm font-medium hover:bg-yellow-50">
+                {t("classes.splitClass")}
+              </button>
+            )}
+            <button onClick={handleDeleteClass}
+              className="w-full sm:w-auto px-4 py-2 rounded-md border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50">
+              {t("classes.deleteClass")}
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Capacity bar */}
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="font-medium text-gray-700 text-sm">{count}/{classData.seuilMax} {t("classes.children")}</span>
+          <span className="font-medium text-gray-700 text-sm">{count}/{group.seuilMax} {t("classes.children")}</span>
           {isOverThreshold && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600">{t("classes.overThreshold")}</span>}
           {isNearFull && !isOverThreshold && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700">{t("classes.nearFull")}</span>}
         </div>
         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div className={`h-full ${isOverThreshold ? "bg-red-500" : isNearFull ? "bg-yellow-400" : "bg-teal-500"}`}
-            style={{ width: `${Math.min((count / classData.seuilMax) * 100, 100)}%` }} />
+            style={{ width: `${Math.min((count / group.seuilMax) * 100, 100)}%` }} />
         </div>
         {isOverThreshold && (
           <p className="mt-2 text-xs text-red-600 bg-red-50 rounded-md px-3 py-2">
-            {t("classes.autoSplitWarning", { count, max: classData.seuilMax })}
+            {t("classes.autoSplitWarning", { count, max: group.seuilMax })}
           </p>
         )}
       </div>
 
-      {/* Tabs */}
       <div className="border-b border-gray-200 overflow-x-auto">
         <div className="flex gap-1 min-w-max">
           {tabs.filter(tab => isManager || tab !== "children").map((tab) => (
@@ -133,7 +247,6 @@ export default function ClassDetailPage() {
         </div>
       </div>
 
-      {/* Children tab (Manager only) */}
       {activeTab === "children" && isManager && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-3">
           <div className="flex items-center justify-between">
@@ -172,7 +285,6 @@ export default function ClassDetailPage() {
         </div>
       )}
 
-      {/* Attendance tab (Teacher + Manager) */}
       {activeTab === "attendance" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -214,7 +326,6 @@ export default function ClassDetailPage() {
         </div>
       )}
 
-      {/* Evaluations tab (Teacher + Manager) */}
       {activeTab === "evaluations" && (
         <div className="space-y-4">
           <div className="flex justify-end">

@@ -1,15 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockAbsencesLog } from "../../../data/mockChildren.js";
+import { fetchChildren } from "../../../lib/api/children.js";
+import { fetchChildAbsences } from "../../../lib/api/absences.js";
+
+// The backend has no crèche-wide "GET /absences" endpoint — only
+// GET /absences/child/{childId}. We fetch the children list, then pull
+// each child's absences and flatten them into one log.
+async function fetchAllAbsences() {
+  const children = await fetchChildren();
+  const perChild = await Promise.all(
+    children.map((c) =>
+      fetchChildAbsences(c.id)
+        .then((list) =>
+          (Array.isArray(list) ? list : list.items || []).map((a) => ({
+            id: a.id,
+            childId: c.id,
+            childName: `${c.prenom} ${c.nom}`,
+            date: a.date,
+            motif: a.reason || a.motif || "",
+            justifie: a.justified ?? a.justifie ?? false,
+          }))
+        )
+        .catch(() => [])
+    )
+  );
+  return perChild.flat().sort((a, b) => (a.date < b.date ? 1 : -1));
+}
 
 export default function AbsenceTrackingPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // TODO: replace with real API call -> apiClient.get("/absences")
-  const [absences] = useState(mockAbsencesLog);
+  const [absences, setAbsences] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState("toutes"); // toutes | justifiee | non_justifiee
+
+  useEffect(() => {
+    fetchAllAbsences()
+      .then(setAbsences)
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [t]);
 
   const filtered = absences.filter((a) => {
     if (filter === "toutes") return true;
@@ -41,6 +74,9 @@ export default function AbsenceTrackingPage() {
           <option value="non_justifiee">{t("children.unjustified")}</option>
         </select>
       </div>
+
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+      {loading && <p className="text-gray-400 text-sm">{t("common.loading")}</p>}
 
       {/* Desktop table */}
       <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">

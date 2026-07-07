@@ -1,28 +1,42 @@
-import { createContext, useContext, useState } from "react";
-import { mockNotifications } from "../../data/mockNotifications.js";
+import { createContext, useContext, useState, useEffect } from "react";
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification } from "../api/notifications.js";
+import { useAuth } from "../auth/AuthContext.jsx";
 
 const NotificationsContext = createContext(null);
 
 export function NotificationsProvider({ children }) {
-  // TODO: replace with real API call -> apiClient.get("/notifications")
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const { user } = useAuth() || {};
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    fetchNotifications()
+      .then(setNotifications)
+      .catch(() => setNotifications([]));
+  }, [user]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   function markAsRead(id) {
-    // TODO: replace with real API call -> apiClient.patch(`/notifications/${id}/read`)
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    markNotificationRead(id).catch(() => {});
   }
 
   function markAllAsRead() {
-    // TODO: replace with real API call -> apiClient.post("/notifications/read-all")
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    markAllNotificationsRead().catch(() => {});
+  }
+
+  function remove(id) {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    deleteNotification(id).catch(() => {});
   }
 
   return (
-    <NotificationsContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead }}>
+    <NotificationsContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, remove }}>
       {children}
     </NotificationsContext.Provider>
   );

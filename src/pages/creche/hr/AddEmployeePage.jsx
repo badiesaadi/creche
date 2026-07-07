@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockClasses } from "../../../data/mockClasses.js";
+import { fetchClasses } from "../../../lib/api/classes.js";
+import { createEmployee, assignEmployeeGroup } from "../../../lib/api/employees.js";
 
 export default function AddEmployeePage() {
   const navigate = useNavigate();
@@ -12,15 +13,22 @@ export default function AddEmployeePage() {
     poste: "",
     telephone: "",
     email: "",
+    password: "",
     dateEmbauche: new Date().toISOString().slice(0, 10),
     salaireBase: "",
     contractType: "CDI",
     contractDateDebut: new Date().toISOString().slice(0, 10),
     contractDateFin: "",
-    classeId: "",  // REQ-013: teacher-to-class assignment
+    classeId: "",  // REQ-013: teacher-to-group assignment (holds a real group uuid)
   });
+  const [classes, setClasses] = useState([]);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  useEffect(() => {
+    fetchClasses().then(setClasses).catch(() => setClasses([]));
+  }, []);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -33,6 +41,7 @@ export default function AddEmployeePage() {
     if (!form.nom.trim()) newErrors.nom = t("common.required");
     if (!form.poste.trim()) newErrors.poste = t("common.required");
     if (!form.telephone.trim()) newErrors.telephone = t("common.required");
+    if (!form.password || form.password.length < 6) newErrors.password = t("common.required");
     if (!form.salaireBase || Number(form.salaireBase) <= 0) newErrors.salaireBase = t("common.required");
     if (!form.contractDateDebut) newErrors.contractDateDebut = t("common.required");
     if (form.contractType === "CDD" && !form.contractDateFin) newErrors.contractDateFin = t("common.required");
@@ -44,10 +53,29 @@ export default function AddEmployeePage() {
     const newErrors = validate();
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setSubmitting(true);
-    // TODO: real API -> apiClient.post("/employees", form)
-    await new Promise((r) => setTimeout(r, 500));
-    setSubmitting(false);
-    navigate("/creche/hr");
+    setSubmitError("");
+    try {
+      const newEmployee = await createEmployee({
+        nom: form.nom,
+        telephone: form.telephone,
+        email: form.email,
+        password: form.password,
+        specialite: form.poste,
+        poste: form.poste,
+        contratType: form.contractType,
+        salaire: form.salaireBase,
+        dateDebut: form.contractDateDebut,
+        dateFin: form.contractDateFin,
+      });
+      if (isTeacher && form.classeId) {
+        await assignEmployeeGroup(newEmployee.id, form.classeId).catch(() => {});
+      }
+      navigate("/creche/hr");
+    } catch (err) {
+      setSubmitError(err.response?.data?.message || t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const isTeacher = form.poste.toLowerCase().includes("enseignant") || form.poste === "Enseignante" || form.poste === "Enseignant";
@@ -82,6 +110,7 @@ export default function AddEmployeePage() {
             </div>
             <Field label={t("hr.phone")} name="telephone" value={form.telephone} onChange={handleChange} error={errors.telephone} />
             <Field label={t("hr.email")} name="email" type="email" value={form.email} onChange={handleChange} />
+            <Field label={t("auth.password") || "Password"} name="password" type="password" value={form.password} onChange={handleChange} error={errors.password} />
             <Field label={t("hr.hireDate")} name="dateEmbauche" type="date" value={form.dateEmbauche} onChange={handleChange} />
             <Field label={`${t("hr.baseSalary")} (DZD)`} name="salaireBase" type="number" value={form.salaireBase} onChange={handleChange} error={errors.salaireBase} />
           </div>
@@ -93,9 +122,11 @@ export default function AddEmployeePage() {
               <select name="classeId" value={form.classeId} onChange={handleChange}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
                 <option value="">— {t("hr.noClassAssigned")} —</option>
-                {mockClasses.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nom} ({c.tranche})</option>
-                ))}
+                {classes.flatMap((c) =>
+                  (c.groups || []).map((g) => (
+                    <option key={g.id} value={g.id}>{c.nom} ({c.tranche}) — {g.nom}</option>
+                  ))
+                )}
               </select>
               <p className="text-xs text-gray-400 mt-1">{t("hr.classAssignmentHint")}</p>
             </div>
@@ -123,6 +154,8 @@ export default function AddEmployeePage() {
             <p className="text-xs text-yellow-600 bg-yellow-50 rounded-md px-3 py-2">{t("hr.cddWarning")}</p>
           )}
         </section>
+
+        {submitError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{submitError}</p>}
 
         <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
           <button type="button" onClick={() => navigate("/creche/hr")}

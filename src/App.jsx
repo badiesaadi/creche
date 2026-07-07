@@ -23,6 +23,7 @@ import EmployeesListPage from "./pages/creche/hr/EmployeesListPage.jsx";
 import EmployeeDetailPage from "./pages/creche/hr/EmployeeDetailPage.jsx";
 import PayslipViewPage from "./pages/creche/hr/PayslipViewPage.jsx";
 import AddEmployeePage from "./pages/creche/hr/AddEmployeePage.jsx";
+import EmployeeEditPage from "./pages/creche/hr/EmployeeEditPage.jsx";
 import SettingsPage from "./pages/creche/settings/SettingsPage.jsx";
 import NotificationsPage from "./pages/creche/notifications/NotificationsPage.jsx";
 
@@ -35,6 +36,7 @@ import EvaluationReportPage from "./pages/creche/documents/EvaluationReportPage.
 // Admin pages
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage.jsx";
 import AdminCrechesPage from "./pages/admin/AdminCrechesPage.jsx";
+import AdminCrecheFormPage from "./pages/admin/AdminCrecheFormPage.jsx";
 import AdminCrecheDetailPage from "./pages/admin/AdminCrecheDetailPage.jsx";
 import AdminHRPage from "./pages/admin/AdminHRPage.jsx";
 import AdminFinancePage from "./pages/admin/AdminFinancePage.jsx";
@@ -62,34 +64,36 @@ export default function App() {
 
         {/* enfants — static before :id */}
         <Route path="enfants" element={<ChildrenListPage />} />
-        <Route path="enfants/nouveau" element={<ChildEnrollmentPage />} />
+        <Route path="enfants/nouveau" element={<ProtectedRoute allowedRoles={["manager"]}><ChildEnrollmentPage /></ProtectedRoute>} />
         <Route path="enfants/absences" element={<AbsenceTrackingPage />} />
-        <Route path="enfants/:id/sortie" element={<ChildWithdrawalPage />} />
-        <Route path="enfants/:id/certificat" element={<EnrollmentCertificatePage />} />
-        <Route path="enfants/:id/evaluation-report" element={<EvaluationReportPage />} />
+        <Route path="enfants/:id/sortie" element={<ProtectedRoute allowedRoles={["manager"]}><ChildWithdrawalPage /></ProtectedRoute>} />
+        <Route path="enfants/:id/modifier" element={<ProtectedRoute allowedRoles={["manager"]}><ChildEnrollmentPage /></ProtectedRoute>} />
+        <Route path="enfants/:id/certificat" element={<ProtectedRoute allowedRoles={["manager"]}><EnrollmentCertificatePage /></ProtectedRoute>} />
+        <Route path="enfants/:id/evaluation-report" element={<ProtectedRoute allowedRoles={["manager"]}><EvaluationReportPage /></ProtectedRoute>} />
         <Route path="enfants/:id" element={<ChildDetailPage />} />
 
         {/* classes */}
         <Route path="classes" element={<ClassesListPage />} />
-        <Route path="classes/nouveau" element={<ClassFormPage />} />
-        <Route path="classes/:id/modifier" element={<ClassFormPage />} />
+        <Route path="classes/nouveau" element={<ProtectedRoute allowedRoles={["manager"]}><ClassFormPage /></ProtectedRoute>} />
+        <Route path="classes/:id/modifier" element={<ProtectedRoute allowedRoles={["manager"]}><ClassFormPage /></ProtectedRoute>} />
         <Route path="classes/:id" element={<ClassDetailPage />} />
 
         {/* payments */}
         <Route path="payments" element={<PaymentsDashboardPage />} />
-        <Route path="payments/nouveau" element={<RecordPaymentPage />} />
-        <Route path="payments/rappels" element={<RemindersPage />} />
-        <Route path="payments/schedule/:childId" element={<PaymentSchedulePage />} />
+        <Route path="payments/nouveau" element={<ProtectedRoute allowedRoles={["manager"]}><RecordPaymentPage /></ProtectedRoute>} />
+        <Route path="payments/rappels" element={<ProtectedRoute allowedRoles={["manager"]}><RemindersPage /></ProtectedRoute>} />
+        <Route path="payments/schedule/:childId" element={<ProtectedRoute allowedRoles={["manager"]}><PaymentSchedulePage /></ProtectedRoute>} />
 
         {/* hr — static before :id */}
-        <Route path="hr" element={<EmployeesListPage />} />
-        <Route path="hr/nouveau" element={<AddEmployeePage />} />
-        <Route path="hr/payslips/:payslipId/pdf" element={<PayslipPDFPage />} />
-        <Route path="hr/payslips/:payslipId" element={<PayslipViewPage />} />
-        <Route path="hr/:id/contrat" element={<WorkContractPage />} />
-        <Route path="hr/:id" element={<EmployeeDetailPage />} />
+        <Route path="hr" element={<ProtectedRoute allowedRoles={["manager"]}><EmployeesListPage /></ProtectedRoute>} />
+        <Route path="hr/nouveau" element={<ProtectedRoute allowedRoles={["manager"]}><AddEmployeePage /></ProtectedRoute>} />
+        <Route path="hr/payslips/:payslipId/pdf" element={<ProtectedRoute allowedRoles={["manager"]}><PayslipPDFPage /></ProtectedRoute>} />
+        <Route path="hr/payslips/:payslipId" element={<ProtectedRoute allowedRoles={["manager"]}><PayslipViewPage /></ProtectedRoute>} />
+        <Route path="hr/:id/contrat" element={<ProtectedRoute allowedRoles={["manager"]}><WorkContractPage /></ProtectedRoute>} />
+        <Route path="hr/:id/modifier" element={<ProtectedRoute allowedRoles={["manager"]}><EmployeeEditPage /></ProtectedRoute>} />
+        <Route path="hr/:id" element={<ProtectedRoute allowedRoles={["manager"]}><EmployeeDetailPage /></ProtectedRoute>} />
 
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings" element={<ProtectedRoute allowedRoles={["manager"]}><SettingsPage /></ProtectedRoute>} />
         <Route path="notifications" element={<NotificationsPage />} />
       </Route>
 
@@ -97,6 +101,8 @@ export default function App() {
       <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><AdminLayout /></ProtectedRoute>}>
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="creches" element={<AdminCrechesPage />} />
+        <Route path="creches/nouveau" element={<AdminCrecheFormPage />} />
+        <Route path="creches/:id/modifier" element={<AdminCrecheFormPage />} />
         <Route path="creches/:id" element={<AdminCrecheDetailPage />} />
         <Route path="hr" element={<AdminHRPage />} />
         <Route path="finance" element={<AdminFinancePage />} />

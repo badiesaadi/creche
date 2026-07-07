@@ -1,19 +1,39 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockEmployees, mockContracts } from "../../../data/mockEmployees.js";
-import { mockSettings } from "../../../data/mockSettings.js";
+import { fetchEmployee } from "../../../lib/api/employees.js";
+import { fetchCreche } from "../../../lib/api/creches.js";
+import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 import PrintLayout from "../../../components/shared/PrintLayout.jsx";
 
 export default function WorkContractPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user } = useAuth();
 
-  // TODO: replace with real API call -> apiClient.get(`/employees/${id}/contract`)
-  const employee = mockEmployees.find((e) => String(e.id) === id);
-  const contract = mockContracts[id];
+  const [employee, setEmployee] = useState(null);
+  const [creche, setCreche] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!employee || !contract) {
+  useEffect(() => {
+    Promise.all([
+      fetchEmployee(id),
+      user?.crecheId ? fetchCreche(user.crecheId).catch(() => null) : Promise.resolve(null),
+    ])
+      .then(([emp, crecheData]) => {
+        setEmployee(emp);
+        setCreche(crecheData);
+      })
+      .catch(() => setEmployee(null))
+      .finally(() => setLoading(false));
+  }, [id, user?.crecheId]);
+
+  if (loading) {
+    return <p className="text-gray-400 text-sm">{t("common.loading")}</p>;
+  }
+
+  if (!employee || !employee.dateEmbauche) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">{t("hr.notFound")}</p>
@@ -21,14 +41,21 @@ export default function WorkContractPage() {
     );
   }
 
+  const contract = {
+    type: employee.contratType,
+    dateDebut: employee.dateEmbauche,
+    dateFin: employee.dateFinContrat,
+    salaire: employee.salaire,
+  };
+
   const today = new Date().toLocaleDateString("fr-DZ");
 
   return (
     <PrintLayout onClose={() => navigate(`/creche/hr/${id}`)}>
       {/* Header */}
       <div className="text-center border-b border-gray-200 pb-6">
-        <h1 className="text-2xl font-bold text-gray-800">{mockSettings.nom}</h1>
-        <p className="text-sm text-gray-500 mt-1">{mockSettings.adresse}</p>
+        <h1 className="text-2xl font-bold text-gray-800">{creche?.nom || employee.creche || ""}</h1>
+        <p className="text-sm text-gray-500 mt-1">{creche?.adresse || ""}</p>
       </div>
 
       {/* Title */}
@@ -42,7 +69,7 @@ export default function WorkContractPage() {
       <div className="space-y-3 text-sm text-gray-700">
         <p className="font-semibold text-gray-800">{t("docs.between")}:</p>
         <p>
-          <span className="font-medium">{t("docs.employer")}:</span> {mockSettings.nom}, {mockSettings.adresse}
+          <span className="font-medium">{t("docs.employer")}:</span> {creche?.nom || employee.creche || ""}, {creche?.adresse || ""}
         </p>
         <p>
           <span className="font-medium">{t("docs.employee")}:</span> {employee.nom}
@@ -55,7 +82,7 @@ export default function WorkContractPage() {
         <DocRow label={t("hr.position")} value={employee.poste} />
         <DocRow label={t("hr.startDate")} value={contract.dateDebut} />
         <DocRow label={t("hr.endDate")} value={contract.dateFin || t("hr.indefinite")} />
-        <DocRow label={t("hr.salary")} value={`${contract.salaire.toLocaleString()} DZD ${t("docs.perMonth")}`} />
+        <DocRow label={t("hr.salary")} value={`${(contract.salaire || 0).toLocaleString()} DZD ${t("docs.perMonth")}`} />
       </div>
 
       {/* Clauses */}

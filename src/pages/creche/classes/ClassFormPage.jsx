@@ -1,24 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockClasses } from "../../../data/mockClasses.js";
+import { fetchGroup, fetchClass, createClass, updateClass, createGroup, updateGroup, assignGroupTeacher } from "../../../lib/api/classes.js";
+import { fetchEmployees } from "../../../lib/api/employees.js";
 
+// Note: the URL's :id is a Group id (groups hold children + a teacher on the
+// real backend, while a "Class" is just the shared age bracket). Creating a
+// new entry here creates a Class *and* its first Group together, since a
+// bare class can't hold children on its own.
 export default function ClassFormPage() {
-  const { id } = useParams(); // undefined = create mode
+  const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const isEdit = Boolean(id);
 
-  const existing = isEdit ? mockClasses.find((c) => String(c.id) === id) : null;
-
   const [form, setForm] = useState({
-    nom: existing?.nom || "",
-    tranche: existing?.tranche || "",
-    enseignant: existing?.enseignant || "",
-    seuilMax: existing?.seuilMax || 15,
+    nom: "", tranche: "", enseignant: "", enseignantId: "", seuilMax: 15,
   });
+  const [classId, setClassId] = useState(null);
+  const [className, setClassName] = useState("");
+  const [ageRange, setAgeRange] = useState("");
+  const [teachers, setTeachers] = useState([]);
+  const [loading, setLoading] = useState(isEdit);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  useEffect(() => {
+    fetchEmployees().then(setTeachers).catch(() => setTeachers([]));
+  }, []);
+
+  useEffect(() => {
+    if (!isEdit) return;
+    fetchGroup(id)
+      .then(async (g) => {
+        setForm({
+          nom: g.nom || "",
+          tranche: "",
+          enseignant: g.enseignant || "",
+          enseignantId: "",
+          seuilMax: g.seuilMax || 15,
+        });
+        setClassId(g.classId || null);
+        if (g.classId) {
+          const cls = await fetchClass(g.classId).catch(() => null);
+          if (cls) {
+            setClassName(cls.nom || "");
+            setAgeRange(cls.tranche?.replace(/\s*ans$/, "") || "");
+          }
+        }
+      })
+      .catch(() => setErrors({ nom: t("common.error") }))
+      .finally(() => setLoading(false));
+  }, [id, isEdit, t]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -29,8 +63,7 @@ export default function ClassFormPage() {
   function validate() {
     const newErrors = {};
     if (!form.nom.trim()) newErrors.nom = t("common.required");
-    if (!form.tranche.trim()) newErrors.tranche = t("common.required");
-    if (!form.enseignant.trim()) newErrors.enseignant = t("common.required");
+    if (!isEdit && !form.tranche.trim()) newErrors.tranche = t("common.required");
     if (!form.seuilMax || form.seuilMax < 1) newErrors.seuilMax = t("classes.invalidThreshold");
     return newErrors;
   }
@@ -44,14 +77,39 @@ export default function ClassFormPage() {
     }
 
     setSubmitting(true);
+    setSubmitError("");
+    try {
+      if (isEdit) {
+        if (classId) {
+          await updateClass(classId, { name: className, maxCapacity: form.seuilMax });
+        }
+        await updateGroup(id, form);
+        if (form.enseignantId) {
+          await assignGroupTeacher(id, form.enseignantId).catch(() => {});
+        }
+      } else {
+        const [minAge, maxAge] = form.tranche.split("-").map((s) => parseInt(s, 10) || 0);
+        const newClass = await createClass({
+          nom: form.nom,
+          minAge: minAge || 0,
+          maxAge: maxAge || minAge || 0,
+          seuilMax: form.seuilMax,
+        });
+        const newGroup = await createGroup({ name: `${form.nom} A`, maxCapacity: form.seuilMax }, newClass.id);
+        if (form.enseignantId) {
+          await assignGroupTeacher(newGroup.id, form.enseignantId).catch(() => {});
+        }
+      }
+      navigate("/creche/classes");
+    } catch (err) {
+      setSubmitError(err.response?.data?.message || t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
-    // TODO: replace with real API call:
-    // isEdit ? apiClient.put(`/classes/${id}`, form) : apiClient.post("/classes", form)
-    await new Promise((r) => setTimeout(r, 500));
-    console.log(isEdit ? "Class updated (mock):" : "Class created (mock):", form);
-
-    setSubmitting(false);
-    navigate("/creche/classes");
+  if (loading) {
+    return <p className="text-gray-400 text-sm">{t("common.loading")}</p>;
   }
 
   return (
@@ -66,16 +124,33 @@ export default function ClassFormPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
-        <Field label={t("classes.className")} name="nom" value={form.nom} onChange={handleChange} error={errors.nom} />
-        <Field
-          label={t("classes.ageRange")}
-          name="tranche"
-          value={form.tranche}
-          onChange={handleChange}
-          error={errors.tranche}
-          placeholder="Ex: 2-3 ans"
-        />
-        <Field label={t("classes.teacher")} name="enseignant" value={form.enseignant} onChange={handleChange} error={errors.enseignant} />
+        {isEdit && (
+          <Field
+            label={t("classes.className")}
+            name="className"
+            value={className}
+            onChange={(e) => setClassName(e.target.value)}
+          />
+        )}
+        <Field label={isEdit ? t("classes.groupName") : t("classes.className")} name="nom" value={form.nom} onChange={handleChange} error={errors.nom} />
+        {!isEdit && (
+          <Field
+            label={t("classes.ageRange")}
+            name="tranche"
+            value={form.tranche}
+            onChange={handleChange}
+            error={errors.tranche}
+            placeholder="Ex: 2-3"
+          />
+        )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{t("classes.teacher")}</label>
+          <select name="enseignantId" value={form.enseignantId} onChange={handleChange}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+            <option value="">{form.enseignant || `— ${t("classes.teacher")} —`}</option>
+            {teachers.map((tch) => <option key={tch.id} value={tch.id}>{tch.nom}</option>)}
+          </select>
+        </div>
         <Field
           label={t("classes.threshold")}
           name="seuilMax"
@@ -84,6 +159,8 @@ export default function ClassFormPage() {
           onChange={handleChange}
           error={errors.seuilMax}
         />
+
+        {submitError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{submitError}</p>}
 
         <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pt-2">
           <button

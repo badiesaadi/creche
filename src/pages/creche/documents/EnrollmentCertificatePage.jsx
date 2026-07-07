@@ -1,16 +1,37 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockChildren } from "../../../data/mockChildren.js";
-import { mockSettings } from "../../../data/mockSettings.js";
+import { fetchChild } from "../../../lib/api/children.js";
+import { fetchCreche } from "../../../lib/api/creches.js";
+import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 import PrintLayout from "../../../components/shared/PrintLayout.jsx";
 
 export default function EnrollmentCertificatePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user } = useAuth();
 
-  // TODO: replace with real API call -> apiClient.get(`/children/${id}`)
-  const child = mockChildren.find((c) => String(c.id) === id);
+  const [child, setChild] = useState(null);
+  const [creche, setCreche] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetchChild(id),
+      user?.crecheId ? fetchCreche(user.crecheId).catch(() => null) : Promise.resolve(null),
+    ])
+      .then(([childData, crecheData]) => {
+        setChild(childData);
+        setCreche(crecheData);
+      })
+      .catch(() => setChild(null))
+      .finally(() => setLoading(false));
+  }, [id, user?.crecheId]);
+
+  if (loading) {
+    return <p className="text-gray-400 text-sm">{t("common.loading")}</p>;
+  }
 
   if (!child) {
     return (
@@ -21,14 +42,15 @@ export default function EnrollmentCertificatePage() {
   }
 
   const today = new Date().toLocaleDateString("fr-DZ");
+  const crecheName = creche?.nom || "";
 
   return (
     <PrintLayout onClose={() => navigate(`/creche/enfants/${id}`)}>
       {/* Header */}
       <div className="text-center border-b border-gray-200 pb-6">
-        <h1 className="text-2xl font-bold text-gray-800">{mockSettings.nom}</h1>
-        <p className="text-sm text-gray-500 mt-1">{mockSettings.adresse}</p>
-        <p className="text-sm text-gray-500">{mockSettings.telephone}</p>
+        <h1 className="text-2xl font-bold text-gray-800">{crecheName}</h1>
+        <p className="text-sm text-gray-500 mt-1">{creche?.adresse || ""}</p>
+        <p className="text-sm text-gray-500">{creche?.telephone || ""}</p>
       </div>
 
       {/* Title */}
@@ -44,7 +66,7 @@ export default function EnrollmentCertificatePage() {
           {t("docs.enrollmentBody1", {
             name: `${child.prenom} ${child.nom}`,
             dob: child.dateNaissance,
-            creche: mockSettings.nom,
+            creche: crecheName,
             date: child.dateInscription,
           })}
         </p>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { apiClient } from "../../lib/api/client.js";
+import { login as loginApi } from "../../lib/api/auth.js";
 import { useAuth } from "../../lib/auth/AuthContext.jsx";
 
 export default function LoginPage() {
@@ -19,29 +19,16 @@ export default function LoginPage() {
   setError("");
   setLoading(true);
 
-  // TODO: replace with real API call -> apiClient.post("/auth/login", { email, password })
-  await new Promise((r) => setTimeout(r, 500)); // fake network delay
-
-  const mockUsers = {
-    "admin@pai.dz": { password: "admin123", user: { id: 1, nom: "Admin PAI", role: "admin" } },
-    "manager@pai.dz": { password: "manager123", user: { id: 2, nom: "Sara Manager", role: "manager", crecheId: 1 } },
-    "teacher@pai.dz": { password: "teacher123", user: { id: 3, nom: "Amine Teacher", role: "teacher", crecheId: 1 } },
-  };
-
-  const entry = mockUsers[email];
-
-  if (!entry || entry.password !== password) {
-    setError(t("common.error"));
+  try {
+    const { user, accessToken, refreshToken } = await loginApi(email, password);
+    login(user, accessToken, refreshToken);
+    if (user.role === "admin") navigate("/admin/dashboard");
+    else navigate("/creche/dashboard");
+  } catch (err) {
+    setError(err.response?.data?.message || t("common.error"));
+  } finally {
     setLoading(false);
-    return;
   }
-
-  login(entry.user, "fake-access-token", "fake-refresh-token");
-
-  if (entry.user.role === "admin") navigate("/admin/dashboard");
-  else navigate("/creche/dashboard");
-
-  setLoading(false);
 }
 
   return (

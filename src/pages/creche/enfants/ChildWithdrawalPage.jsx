@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockChildren } from "../../../data/mockChildren.js";
+import { fetchChild, withdrawChild } from "../../../lib/api/children.js";
 import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 
 export default function ChildWithdrawalPage() {
@@ -10,7 +10,15 @@ export default function ChildWithdrawalPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  const child = mockChildren.find((c) => String(c.id) === id);
+  const [child, setChild] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchChild(id)
+      .then(setChild)
+      .catch(() => setChild(null))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   const [reason, setReason] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -28,6 +36,10 @@ export default function ChildWithdrawalPage() {
         </button>
       </div>
     );
+  }
+
+  if (loading) {
+    return <p className="text-gray-400 text-sm">{t("common.loading")}</p>;
   }
 
   if (!child) {
@@ -51,12 +63,14 @@ export default function ChildWithdrawalPage() {
     setError("");
     setSubmitting(true);
 
-    // TODO: replace with real API call -> apiClient.patch(`/children/${id}/withdraw`, { date, reason })
-    await new Promise((r) => setTimeout(r, 500));
-    console.log("Child withdrawn (mock):", { childId: id, date, reason });
-
-    setSubmitting(false);
-    navigate("/creche/enfants");
+    try {
+      await withdrawChild(id, { date, reason });
+      navigate("/creche/enfants");
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (

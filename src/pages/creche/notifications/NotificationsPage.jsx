@@ -12,7 +12,7 @@ const typeLabels = {
 export default function NotificationsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { notifications, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, markAsRead, markAllAsRead, remove } = useNotifications();
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -42,12 +42,11 @@ export default function NotificationsPage() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
           {notifications.map((n) => (
-            <button
+            <div
               key={n.id}
-              onClick={() => handleClick(n)}
-              className={`w-full text-start px-5 py-4 hover:bg-gray-50 transition-colors ${!n.read ? "bg-teal-50/40" : ""}`}
+              className={`w-full flex items-start gap-2 px-5 py-4 hover:bg-gray-50 transition-colors ${!n.read ? "bg-teal-50/40" : ""}`}
             >
-              <div className="flex items-start gap-4">
+              <button onClick={() => handleClick(n)} className="flex-1 text-start flex items-start gap-4 min-w-0">
                 <span className="mt-0.5 shrink-0 w-9 h-9 rounded-md bg-teal-50 text-teal-700 text-xs font-bold flex items-center justify-center">
                   {typeLabels[n.type] || "!"}
                 </span>
@@ -58,8 +57,15 @@ export default function NotificationsPage() {
                   <p className="text-xs text-gray-400 mt-1">{n.date}</p>
                 </div>
                 {!n.read && <span className="w-2.5 h-2.5 rounded-full bg-teal-500 mt-1.5 shrink-0" />}
-              </div>
-            </button>
+              </button>
+              <button
+                onClick={() => remove(n.id)}
+                title={t("notifications.delete")}
+                className="shrink-0 text-gray-300 hover:text-red-500 text-lg leading-none px-1 py-1"
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
       )}

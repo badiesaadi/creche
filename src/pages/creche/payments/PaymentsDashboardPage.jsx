@@ -1,39 +1,45 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockPayments, mockReminders } from "../../../data/mockPayments.js";
+import { fetchChildren } from "../../../lib/api/children.js";
+import { fetchChildPayments } from "../../../lib/api/payments.js";
+
+// The backend has no crèche-wide "GET /payments" endpoint — only
+// GET /payments/child/{childId}. We fetch children, then pull each child's
+// payments and flatten them into one list.
+async function fetchAllPayments() {
+  const children = await fetchChildren();
+  const perChild = await Promise.all(
+    children.map((c) =>
+      fetchChildPayments(c.id)
+        .then((list) => list.map((p) => ({ ...p, childName: `${c.prenom} ${c.nom}` })))
+        .catch(() => [])
+    )
+  );
+  return perChild.flat().sort((a, b) => (a.date < b.date ? 1 : -1));
+}
 
 export default function PaymentsDashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // TODO: replace with real API calls
-  const [payments] = useState(mockPayments);
-  const [reminders, setReminders] = useState(mockReminders);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("tous");
 
-  const totalCollected = payments.filter((p) => p.statut === "paye").reduce((sum, p) => sum + p.montant, 0);
-  const totalOverdue = payments.filter((p) => p.statut === "en_retard").reduce((sum, p) => sum + p.montant, 0);
+  useEffect(() => {
+    fetchAllPayments()
+      .then(setPayments)
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [t]);
+
+  const totalCollected = payments.filter((p) => p.statut === "paye").reduce((sum, p) => sum + (p.montant || 0), 0);
+  const totalOverdue = payments.filter((p) => p.statut === "en_retard").reduce((sum, p) => sum + (p.montant || 0), 0);
   const overdueCount = payments.filter((p) => p.statut === "en_retard").length;
 
   const filtered = payments.filter((p) => statusFilter === "tous" || p.statut === statusFilter);
-
-  // Auto-reminder: overdue payments that have no reminder sent yet
-  const overdueWithoutReminder = payments
-    .filter((p) => p.statut === "en_retard")
-    .filter((p) => !reminders.find((r) => r.paymentId === p.id && r.status === "envoye"));
-
-  function handleAutoReminder() {
-    // TODO: replace with real API call -> apiClient.post("/payments/reminders/auto")
-    setReminders((prev) =>
-      prev.map((r) =>
-        r.status === "non_envoye"
-          ? { ...r, status: "envoye", sentDate: new Date().toISOString().slice(0, 10) }
-          : r
-      )
-    );
-    alert(t("payments.autoReminderSent", { count: overdueWithoutReminder.length }));
-  }
 
   return (
     <div className="space-y-5">
@@ -47,27 +53,15 @@ export default function PaymentsDashboardPage() {
         </button>
       </div>
 
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+      {loading && <p className="text-gray-400 text-sm">{t("common.loading")}</p>}
+
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label={t("payments.totalCollected")} value={`${totalCollected.toLocaleString()} DZD`} color="text-green-600" />
         <StatCard label={t("payments.totalOverdue")} value={`${totalOverdue.toLocaleString()} DZD`} color="text-red-600" />
         <StatCard label={t("payments.overdueCount")} value={overdueCount} color="text-yellow-600" />
       </div>
-
-      {/* Auto-reminder banner */}
-      {overdueWithoutReminder.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="text-sm text-yellow-800">
-            {t("payments.autoReminderBanner", { count: overdueWithoutReminder.length })}
-          </p>
-          <button
-            onClick={handleAutoReminder}
-            className="w-full sm:w-auto px-4 py-2 rounded-md bg-yellow-500 text-white text-sm font-medium hover:bg-yellow-600"
-          >
-            {t("payments.triggerAutoReminder")}
-          </button>
-        </div>
-      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -111,7 +105,7 @@ export default function PaymentsDashboardPage() {
                   {p.childName}
                 </td>
                 <td className="px-4 py-3 text-gray-600">{p.date}</td>
-                <td className="px-4 py-3 text-gray-800">{p.montant.toLocaleString()} DZD</td>
+                <td className="px-4 py-3 text-gray-800">{(p.montant || 0).toLocaleString()} DZD</td>
                 <td className="px-4 py-3 text-gray-600">{p.methode}</td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -154,7 +148,7 @@ export default function PaymentsDashboardPage() {
                 {p.statut === "paye" ? t("children.paid") : t("children.overdue")}
               </span>
             </div>
-            <p className="text-sm text-gray-600">{p.montant.toLocaleString()} DZD · {p.methode}</p>
+            <p className="text-sm text-gray-600">{(p.montant || 0).toLocaleString()} DZD · {p.methode}</p>
             <p className="text-xs text-gray-400 mt-1">{p.date}</p>
             <button
               onClick={() => navigate(`/creche/payments/schedule/${p.childId}`)}

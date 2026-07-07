@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockPaymentSchedules } from "../../../data/mockPayments.js";
+import { fetchChild } from "../../../lib/api/children.js";
+import { fetchChildPayments } from "../../../lib/api/payments.js";
 
 const statusStyles = {
   paye: "bg-green-50 text-green-700",
@@ -13,12 +15,39 @@ export default function PaymentSchedulePage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  // TODO: replace with real API call -> apiClient.get(`/children/${childId}/payment-schedule`)
-  const schedule = mockPaymentSchedules.find((s) => String(s.childId) === childId);
+  const [schedule, setSchedule] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchChild(childId), fetchChildPayments(childId)])
+      .then(([child, payments]) => {
+        setSchedule({
+          childName: `${child.prenom} ${child.nom}`,
+          schedules: payments.map((p) => ({
+            month: (p.date || "").slice(0, 7),
+            dueDate: p.date,
+            montant: p.montant || 0,
+            statut: p.statut,
+          })),
+        });
+      })
+      .catch((err) => {
+        setSchedule(null);
+        setError(err.response?.data?.message || t("common.error"));
+      })
+      .finally(() => setLoading(false));
+  }, [childId, t]);
+
+  if (loading) {
+    return <p className="text-gray-400 text-sm">{t("common.loading")}</p>;
+  }
 
   if (!schedule) {
     return (
       <div className="text-center py-12">
+        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2 mb-3 inline-block">{error}</p>}
         <p className="text-gray-500">{t("children.notFound")}</p>
         <button onClick={() => navigate("/creche/payments")} className="mt-3 text-teal-600 hover:underline text-sm">
           ← {t("common.cancel")}

@@ -1,17 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { mockNetworkChildren, mockCrecheNetwork } from "../../data/mockAdmin.js";
+import { fetchAdminChildren } from "../../lib/api/admin.js";
+import { fetchCreches } from "../../lib/api/creches.js";
+import { generateEnrollmentCertificate } from "../../lib/api/documents.js";
 
 export default function AdminChildrenPage() {
   const { t } = useTranslation();
+  const [children, setChildren] = useState([]);
+  const [creches, setCreches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [crecheFilter, setCrecheFilter] = useState("toutes");
   const [insuranceFilter, setInsuranceFilter] = useState("tous");
   const [selected, setSelected] = useState([]);
 
-  const creches = mockCrecheNetwork.map((c) => c.nom);
+  useEffect(() => {
+    Promise.all([fetchAdminChildren(), fetchCreches()])
+      .then(([childrenList, crechesList]) => {
+        setChildren(childrenList);
+        setCreches(crechesList);
+      })
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [t]);
 
-  const filtered = mockNetworkChildren.filter((child) => {
+  const crecheNames = creches.map((c) => c.nom);
+
+  const filtered = children.filter((child) => {
     const name = `${child.prenom} ${child.nom}`.toLowerCase();
     const matchSearch = name.includes(search.toLowerCase());
     const matchCreche = crecheFilter === "toutes" || child.creche === crecheFilter;
@@ -22,7 +38,7 @@ export default function AdminChildrenPage() {
     return matchSearch && matchCreche && matchInsurance;
   });
 
-  const uninsuredCount = mockNetworkChildren.filter((c) => !c.assure).length;
+  const uninsuredCount = children.filter((c) => !c.assure).length;
 
   function toggleSelect(id) {
     setSelected((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
@@ -30,10 +46,64 @@ export default function AdminChildrenPage() {
   function toggleAll() {
     setSelected(selected.length === filtered.length ? [] : filtered.map((c) => c.id));
   }
-  function handleBulkCertificate() {
-    // TODO: real API -> apiClient.post("/admin/children/certificates/bulk", { ids: selected })
-    alert(t("admin.bulkCertificateMsg", { count: selected.length }));
+
+  async function handleCertificate(child) {
+    try {
+      const url = await generateEnrollmentCertificate(child.id);
+      if (url) {
+        window.open(url, "_blank");
+        return;
+      }
+    } catch {
+      // fall through to the client-rendered printable version below
+    }
+    printCertificates([child]);
+  }
+
+  async function handleBulkCertificate() {
+    const children_ = children.filter((c) => selected.includes(c.id));
+    // No bulk-certificate endpoint on the backend — generate one at a time.
+    const urls = await Promise.all(
+      children_.map((c) => generateEnrollmentCertificate(c.id).catch(() => null))
+    );
+    const missing = children_.filter((_, i) => !urls[i]);
+    urls.forEach((url) => url && window.open(url, "_blank"));
+    if (missing.length) printCertificates(missing);
     setSelected([]);
+  }
+
+  function printCertificates(children) {
+    const today = new Date().toLocaleDateString("fr-DZ");
+    const blocks = children.map((child) => `
+      <div class="cert">
+        <h1>${child.creche}</h1>
+        <h2>${t("docs.enrollmentCertificate")}</h2>
+        <p>${t("docs.enrollmentBody1", {
+          name: `${child.prenom} ${child.nom}`,
+          dob: child.dateNaissance || "—",
+          creche: child.creche,
+          date: child.dateInscription,
+        })}</p>
+        <p>${t("docs.enrollmentBody2")}</p>
+        <div class="row"><span>${t("children.fullName")}</span><span>${child.prenom} ${child.nom}</span></div>
+        <div class="row"><span>${t("children.enrollmentDate")}</span><span>${child.dateInscription}</span></div>
+        <div class="sig"><span>${t("docs.issuedOn", { date: today })}</span><div>${t("docs.managerSignature")}<div class="line"></div></div></div>
+      </div>`).join("");
+
+    const win = window.open("", "_blank");
+    win.document.write(`<!DOCTYPE html><html><head><title>${t("docs.bulkCertificateTitle")}</title>
+      <style>body{font-family:sans-serif;padding:24px}
+      .cert{max-width:700px;margin:0 auto 40px;padding-bottom:30px;border-bottom:1px dashed #d1d5db}
+      .cert:last-child{border-bottom:none}
+      h1{text-align:center;font-size:16px;color:#6b7280;text-transform:uppercase}
+      h2{text-align:center;font-size:18px}
+      p{line-height:1.6;color:#374151}
+      .row{display:flex;gap:8px;margin:4px 0} .row span:first-child{font-weight:600;width:180px}
+      .sig{display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px;font-size:12px;color:#9ca3af}
+      .sig .line{border-top:1px solid #9ca3af;width:140px;margin-top:30px}</style></head>
+      <body>${blocks}</body></html>`);
+    win.document.close();
+    win.print();
   }
 
   return (
@@ -53,6 +123,9 @@ export default function AdminChildrenPage() {
         )}
       </div>
 
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+      {loading && <p className="text-gray-400 text-sm">{t("common.loading")}</p>}
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -61,7 +134,7 @@ export default function AdminChildrenPage() {
         <select value={crecheFilter} onChange={(e) => setCrecheFilter(e.target.value)}
           className="w-full sm:w-48 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
           <option value="toutes">{t("admin.allCreches")}</option>
-          {creches.map((c) => <option key={c} value={c}>{c}</option>)}
+          {crecheNames.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={insuranceFilter} onChange={(e) => setInsuranceFilter(e.target.value)}
           className="w-full sm:w-48 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
@@ -103,7 +176,7 @@ export default function AdminChildrenPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-end">
-                  <button onClick={() => alert(`${t("docs.enrollmentCertificate")} — ${child.prenom} ${child.nom}`)}
+                  <button onClick={() => handleCertificate(child)}
                     className="text-xs text-teal-600 hover:underline">{t("docs.certificate")}</button>
                 </td>
               </tr>

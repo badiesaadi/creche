@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { apiClient } from "../api/client.js";
+import { fetchMe, logoutApi } from "../api/auth.js";
 
 const AuthContext = createContext(null);
 
@@ -14,19 +14,13 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // TODO: replace with real API call -> apiClient.get("/auth/me")
-    // For now, mock mode just trusts the stored token + no user refetch
-    setLoading(false);
-
-    /*
-    apiClient.get("/auth/me")
-      .then((res) => setUser(res.data))
+    fetchMe()
+      .then((userData) => setUser(userData))
       .catch(() => {
         localStorage.removeItem("gc_access_token");
         localStorage.removeItem("gc_refresh_token");
       })
       .finally(() => setLoading(false));
-    */
   }, []);
 
   const login = (userData, accessToken, refreshToken) => {
@@ -36,6 +30,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    logoutApi().catch(() => {}); // best-effort; local session is cleared regardless
     localStorage.removeItem("gc_access_token");
     localStorage.removeItem("gc_refresh_token");
     setUser(null);

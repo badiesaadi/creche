@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { mockExpenses, mockCrecheNetwork } from "../../data/mockAdmin.js";
+import { fetchCharges, addCharge } from "../../lib/api/admin.js";
+import { fetchCreches } from "../../lib/api/creches.js";
 
 const categories = ["Loyer", "Eau/Électricité", "Fournitures", "Maintenance", "Salaires", "Alimentation", "Autre"];
-const modes = ["Espèces", "Virement", "CIB", "Chèque"];
+const modes = ["Espèces", "CIB", "Chèque"];
 
 export default function AdminExpensesPage() {
   const { t } = useTranslation();
-  const [expenses, setExpenses] = useState(mockExpenses);
+  const [expenses, setExpenses] = useState([]);
+  const [creches, setCreches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [crecheFilter, setCrecheFilter] = useState("toutes");
   const [typeFilter, setTypeFilter] = useState("tous");
   const [showForm, setShowForm] = useState(false);
@@ -16,14 +20,26 @@ export default function AdminExpensesPage() {
     type: "ponctuelle", frequence: "mensuelle", mode: "Espèces", reference: "",
   });
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const creches = mockCrecheNetwork;
+  useEffect(() => {
+    fetchCreches()
+      .then(async (crechesList) => {
+        setCreches(crechesList);
+        const nameById = Object.fromEntries(crechesList.map((c) => [c.id, c.nom]));
+        const charges = await fetchCharges({ crecheNameById: nameById });
+        setExpenses(charges);
+      })
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [t]);
+
   const filtered = expenses.filter((e) => {
     const matchCreche = crecheFilter === "toutes" || String(e.crecheId) === crecheFilter;
     const matchType = typeFilter === "tous" || e.type === typeFilter;
     return matchCreche && matchType;
   });
-  const total = filtered.reduce((sum, e) => sum + e.montant, 0);
+  const total = filtered.reduce((sum, e) => sum + (e.montant || 0), 0);
 
   function handleChange(ev) {
     const { name, value } = ev.target;
@@ -40,21 +56,22 @@ export default function AdminExpensesPage() {
     return errs;
   }
 
-  function handleSubmit(ev) {
+  async function handleSubmit(ev) {
     ev.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    const creche = creches.find((c) => String(c.id) === form.crecheId);
-    const newExpense = {
-      id: Date.now(), crecheId: Number(form.crecheId), creche: creche?.nom || "",
-      categorie: form.categorie, montant: Number(form.montant), date: form.date,
-      type: form.type, frequence: form.type === "recurrente" ? form.frequence : null,
-      mode: form.mode, reference: form.reference,
-    };
-    // TODO: real API -> apiClient.post("/admin/expenses", newExpense)
-    setExpenses((p) => [newExpense, ...p]);
-    setForm({ crecheId: "", categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), type: "ponctuelle", frequence: "mensuelle", mode: "Espèces", reference: "" });
-    setShowForm(false);
+    setSubmitting(true);
+    try {
+      const creche = creches.find((c) => String(c.id) === form.crecheId);
+      const newExpense = await addCharge(form);
+      setExpenses((p) => [{ ...newExpense, creche: creche?.nom || "" }, ...p]);
+      setForm({ crecheId: "", categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), type: "ponctuelle", frequence: "mensuelle", mode: "Espèces", reference: "" });
+      setShowForm(false);
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -66,6 +83,9 @@ export default function AdminExpensesPage() {
           {showForm ? t("common.cancel") : `+ ${t("admin.addExpense")}`}
         </button>
       </div>
+
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+      {loading && <p className="text-gray-400 text-sm">{t("common.loading")}</p>}
 
       {/* Total */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 inline-block">
@@ -105,8 +125,8 @@ export default function AdminExpensesPage() {
             <InputField label={t("admin.reference")} name="reference" value={form.reference} onChange={handleChange} />
           </div>
           <div className="flex justify-end">
-            <button type="submit" className="px-5 py-2 rounded-md bg-teal-600 text-white text-sm font-medium hover:bg-teal-700">
-              {t("common.save")}
+            <button type="submit" disabled={submitting} className="px-5 py-2 rounded-md bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
+              {submitting ? t("common.loading") : t("common.save")}
             </button>
           </div>
         </form>
@@ -146,7 +166,7 @@ export default function AdminExpensesPage() {
                 <td className="px-4 py-3 text-gray-600">{e.date}</td>
                 <td className="px-4 py-3 text-gray-700">{e.creche}</td>
                 <td className="px-4 py-3 font-medium text-gray-800">{e.categorie}</td>
-                <td className="px-4 py-3 text-red-600 font-medium">{e.montant.toLocaleString()} DZD</td>
+                <td className="px-4 py-3 text-red-600 font-medium">{(e.montant || 0).toLocaleString()} DZD</td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${e.type === "recurrente" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
                     {e.type === "recurrente" ? t("admin.recurring") : t("admin.oneTime")}
@@ -167,7 +187,7 @@ export default function AdminExpensesPage() {
           <div key={e.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-1">
               <span className="font-medium text-gray-800">{e.categorie}</span>
-              <span className="font-semibold text-red-500">{e.montant.toLocaleString()} DZD</span>
+              <span className="font-semibold text-red-500">{(e.montant || 0).toLocaleString()} DZD</span>
             </div>
             <p className="text-xs text-gray-500">{e.creche} · {e.date} · {e.mode}</p>
           </div>

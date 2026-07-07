@@ -1,18 +1,42 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockCrecheNetwork, mockGlobalHR, mockGlobalFinance } from "../../data/mockAdmin.js";
+import { fetchCreche } from "../../lib/api/creches.js";
+import { fetchAdminEmployees, fetchAdminFinancial } from "../../lib/api/admin.js";
 
 export default function AdminCrecheDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  const creche = mockCrecheNetwork.find((c) => String(c.id) === id);
-  const employees = mockGlobalHR.filter((e) => String(e.crecheId) === id);
-  const finance = mockGlobalFinance.filter((f) => f.creche === creche?.nom);
+  const [creche, setCreche] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [finance, setFinance] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  if (!creche) {
+  useEffect(() => {
+    Promise.all([
+      fetchCreche(id),
+      fetchAdminEmployees({ crecheId: id }).catch(() => []),
+      // Best-effort: backend financial history shape isn't documented in
+      // detail (see admin.js note) — fall back to an empty list if it errors.
+      fetchAdminFinancial({ crecheId: id }).catch(() => []),
+    ])
+      .then(([crecheData, employeesData, financeData]) => {
+        setCreche(crecheData);
+        setEmployees(employeesData);
+        setFinance(Array.isArray(financeData) ? financeData : []);
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return <p className="text-gray-400 text-sm py-8 text-center">{t("common.loading")}</p>;
+  }
+
+  if (notFound || !creche) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">{t("admin.crecheNotFound")}</p>
@@ -23,7 +47,10 @@ export default function AdminCrecheDetailPage() {
     );
   }
 
-  const netRevenue = creche.revenueMonth - creche.chargesMonth;
+  const revenueMonth = creche.revenueMonth || 0;
+  const chargesMonth = creche.chargesMonth || 0;
+  const tauxRemplissage = creche.tauxRemplissage || 0;
+  const netRevenue = revenueMonth - chargesMonth;
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -38,13 +65,17 @@ export default function AdminCrecheDetailPage() {
           </div>
           <p className="text-sm text-gray-500">{creche.adresse} · {creche.telephone}</p>
         </div>
+        <button onClick={() => navigate(`/admin/creches/${id}/modifier`)}
+          className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 whitespace-nowrap">
+          {t("admin.editCreche")}
+        </button>
       </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KPICard label={t("admin.children")} value={creche.enfantsCount} color="text-teal-700" />
-        <KPICard label={t("admin.employees")} value={creche.employesCount} color="text-blue-700" />
-        <KPICard label={t("admin.fillRate")} value={`${creche.tauxRemplissage}%`} color={creche.tauxRemplissage > 80 ? "text-orange-600" : "text-teal-700"} />
+        <KPICard label={t("admin.children")} value={creche.enfantsCount ?? employees.length} color="text-teal-700" />
+        <KPICard label={t("admin.employees")} value={creche.employesCount ?? employees.length} color="text-blue-700" />
+        <KPICard label={t("admin.fillRate")} value={`${tauxRemplissage}%`} color={tauxRemplissage > 80 ? "text-orange-600" : "text-teal-700"} />
         <KPICard label={t("admin.netRevenue")} value={`${netRevenue.toLocaleString()} DZD`} color="text-green-700" />
       </div>
 
@@ -52,11 +83,11 @@ export default function AdminCrecheDetailPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-gray-700">{t("admin.fillRate")}</span>
-          <span className="text-sm font-bold text-gray-800">{creche.tauxRemplissage}%</span>
+          <span className="text-sm font-bold text-gray-800">{tauxRemplissage}%</span>
         </div>
         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full ${creche.tauxRemplissage > 90 ? "bg-red-500" : creche.tauxRemplissage > 75 ? "bg-yellow-400" : "bg-teal-500"}`}
-            style={{ width: `${creche.tauxRemplissage}%` }} />
+          <div className={`h-full rounded-full ${tauxRemplissage > 90 ? "bg-red-500" : tauxRemplissage > 75 ? "bg-yellow-400" : "bg-teal-500"}`}
+            style={{ width: `${tauxRemplissage}%` }} />
         </div>
       </div>
 
@@ -66,11 +97,11 @@ export default function AdminCrecheDetailPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
           <div>
             <p className="text-xs text-gray-400 uppercase mb-1">{t("admin.collected")}</p>
-            <p className="text-lg font-bold text-green-600">{creche.revenueMonth.toLocaleString()} DZD</p>
+            <p className="text-lg font-bold text-green-600">{revenueMonth.toLocaleString()} DZD</p>
           </div>
           <div>
             <p className="text-xs text-gray-400 uppercase mb-1">{t("admin.expenses")}</p>
-            <p className="text-lg font-bold text-red-500">{creche.chargesMonth.toLocaleString()} DZD</p>
+            <p className="text-lg font-bold text-red-500">{chargesMonth.toLocaleString()} DZD</p>
           </div>
           <div>
             <p className="text-xs text-gray-400 uppercase mb-1">{t("admin.netRevenue")}</p>
@@ -92,7 +123,7 @@ export default function AdminCrecheDetailPage() {
                   <p className="text-sm font-medium text-gray-800">{e.nom}</p>
                   <p className="text-xs text-gray-500">{e.poste}</p>
                 </div>
-                <p className="text-sm text-gray-700">{e.salaire.toLocaleString()} DZD</p>
+                <p className="text-sm text-gray-700">{(e.salaire || 0).toLocaleString()} DZD</p>
               </div>
             ))}
           </div>
@@ -115,12 +146,12 @@ export default function AdminCrecheDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {finance.map((f) => (
-                <tr key={f.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3 font-medium text-gray-800">{f.mois}</td>
-                  <td className="px-4 py-3 text-green-600">{f.collected.toLocaleString()} DZD</td>
-                  <td className="px-4 py-3 text-red-500">{f.expenses.toLocaleString()} DZD</td>
-                  <td className="px-4 py-3 font-semibold text-teal-700">{(f.collected - f.expenses).toLocaleString()} DZD</td>
+              {finance.map((f, idx) => (
+                <tr key={f.id ?? idx} className="border-t border-gray-100">
+                  <td className="px-4 py-3 font-medium text-gray-800">{f.mois || f.month}</td>
+                  <td className="px-4 py-3 text-green-600">{(f.collected || 0).toLocaleString()} DZD</td>
+                  <td className="px-4 py-3 text-red-500">{(f.expenses || 0).toLocaleString()} DZD</td>
+                  <td className="px-4 py-3 font-semibold text-teal-700">{((f.collected || 0) - (f.expenses || 0)).toLocaleString()} DZD</td>
                 </tr>
               ))}
             </tbody>

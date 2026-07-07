@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockClasses } from "../../../data/mockClasses.js";
+import { fetchClasses } from "../../../lib/api/classes.js";
 import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 
 export default function ClassesListPage() {
@@ -9,10 +9,24 @@ export default function ClassesListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // TODO: replace with real API call -> apiClient.get("/classes")
-  const [classes] = useState(mockClasses);
+  const [classesData, setClassesData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchClasses()
+      .then(setClassesData)
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [t]);
 
   const isManager = user?.role === "manager";
+
+  // Each backend "class" is an age bracket; the groups nested inside it are
+  // what actually hold children and a teacher, so those are what we show as cards.
+  const classes = classesData.flatMap((cls) =>
+    (cls.groups || []).map((g) => ({ ...g, tranche: cls.tranche, className: cls.nom }))
+  );
 
   return (
     <div className="space-y-5">
@@ -28,6 +42,9 @@ export default function ClassesListPage() {
         )}
       </div>
 
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+      {loading && <p className="text-gray-400 text-sm">{t("common.loading")}</p>}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {classes.map((c) => {
           const count = c.enfantIds.length;
@@ -41,7 +58,7 @@ export default function ClassesListPage() {
               className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 cursor-pointer hover:shadow-md transition-shadow"
             >
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-gray-800">{c.nom}</h3>
+                <h3 className="font-semibold text-gray-800">{c.className} — {c.nom}</h3>
                 <span className="text-xs text-gray-400">{c.tranche}</span>
               </div>
 

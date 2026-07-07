@@ -1,10 +1,32 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../lib/auth/AuthContext.jsx";
-import { mockChildren } from "../../../data/mockChildren.js";
-import { mockClasses } from "../../../data/mockClasses.js";
-import { mockPayments } from "../../../data/mockPayments.js";
-import { mockAbsencesLog } from "../../../data/mockChildren.js";
+import { fetchChildren } from "../../../lib/api/children.js";
+import { fetchClasses } from "../../../lib/api/classes.js";
+import { fetchLatePayments } from "../../../lib/api/payments.js";
+import { fetchChildAbsences } from "../../../lib/api/absences.js";
+
+// No crèche-wide "GET /absences" endpoint exists — aggregate per child.
+async function fetchAllAbsences(children) {
+  const perChild = await Promise.all(
+    children.map((c) =>
+      fetchChildAbsences(c.id)
+        .then((list) =>
+          (Array.isArray(list) ? list : list.items || []).map((a) => ({
+            id: a.id,
+            childId: c.id,
+            childName: `${c.prenom} ${c.nom}`,
+            date: a.date,
+            motif: a.reason || a.motif || "",
+            justifie: a.justified ?? a.justifie ?? false,
+          }))
+        )
+        .catch(() => [])
+    )
+  );
+  return perChild.flat().sort((a, b) => (a.date < b.date ? 1 : -1));
+}
 
 export default function CrecheDashboardPage() {
   const { t } = useTranslation();
@@ -12,13 +34,38 @@ export default function CrecheDashboardPage() {
   const { user } = useAuth();
   const isManager = user?.role === "manager";
 
-  // TODO: replace with real API calls
-  const activeChildren = mockChildren.filter((c) => c.statut === "actif");
-  const overduePayments = mockPayments.filter((p) => p.statut === "en_retard");
-  const unjustifiedAbsences = mockAbsencesLog.filter((a) => !a.justifie);
-  const classCount = mockClasses.length;
+  const [children, setChildren] = useState([]);
+  const [classesData, setClassesData] = useState([]);
+  const [overduePayments, setOverduePayments] = useState([]);
+  const [absences, setAbsences] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const recentAbsences = mockAbsencesLog.slice(0, 3);
+  useEffect(() => {
+    fetchChildren()
+      .then(async (childrenList) => {
+        setChildren(childrenList);
+        const [classesList, absencesList, latePayments] = await Promise.all([
+          fetchClasses().catch(() => []),
+          fetchAllAbsences(childrenList).catch(() => []),
+          isManager ? fetchLatePayments().catch(() => []) : Promise.resolve([]),
+        ]);
+        setClassesData(classesList);
+        setAbsences(absencesList);
+        const byId = Object.fromEntries(childrenList.map((c) => [c.id, `${c.prenom} ${c.nom}`]));
+        setOverduePayments(latePayments.map((p) => ({ ...p, childName: byId[p.childId] || p.childId })));
+      })
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [isManager, t]);
+
+  const activeChildren = children.filter((c) => c.statut === "actif");
+  const unjustifiedAbsences = absences.filter((a) => !a.justifie);
+  const groups = classesData.flatMap((cls) =>
+    (cls.groups || []).map((g) => ({ ...g, tranche: cls.tranche, className: cls.nom }))
+  );
+
+  const recentAbsences = absences.slice(0, 3);
   const recentOverdue = overduePayments.slice(0, 3);
 
   return (
@@ -27,6 +74,9 @@ export default function CrecheDashboardPage() {
         <h1 className="text-xl font-bold text-gray-800">{t("nav.dashboard")}</h1>
         <p className="text-sm text-gray-500 mt-0.5">{t("dashboard.welcome", { name: user?.nom })}</p>
       </div>
+
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+      {loading && <p className="text-gray-400 text-sm">{t("common.loading")}</p>}
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -38,7 +88,7 @@ export default function CrecheDashboardPage() {
         />
         <KPICard
           label={t("dashboard.classes")}
-          value={classCount}
+          value={classesData.length}
           color="text-blue-700"
           onClick={() => navigate("/creche/classes")}
         />
@@ -116,7 +166,7 @@ export default function CrecheDashboardPage() {
                       <p className="text-xs text-gray-500">{p.date}</p>
                     </div>
                     <span className="text-sm font-semibold text-red-600">
-                      {p.montant.toLocaleString()} DZD
+                      {(p.montant || 0).toLocaleString()} DZD
                     </span>
                   </div>
                 ))}
@@ -124,7 +174,7 @@ export default function CrecheDashboardPage() {
             )}
           </div>
         ) : (
-          /* Teacher: show classes instead */
+          /* Teacher: show groups instead */
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-gray-700">{t("nav.classes")}</h2>
@@ -133,18 +183,18 @@ export default function CrecheDashboardPage() {
               </button>
             </div>
             <div className="space-y-2">
-              {mockClasses.map((c) => (
+              {groups.map((g) => (
                 <div
-                  key={c.id}
-                  onClick={() => navigate(`/creche/classes/${c.id}`)}
+                  key={g.id}
+                  onClick={() => navigate(`/creche/classes/${g.id}`)}
                   className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-50 cursor-pointer"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-800">{c.nom}</p>
-                    <p className="text-xs text-gray-500">{c.tranche} · {c.enseignant}</p>
+                    <p className="text-sm font-medium text-gray-800">{g.className} — {g.nom}</p>
+                    <p className="text-xs text-gray-500">{g.tranche} · {g.enseignant || "—"}</p>
                   </div>
                   <span className="text-sm text-gray-500">
-                    {c.enfantIds.length}/{c.seuilMax}
+                    {g.enfantIds.length}/{g.seuilMax}
                   </span>
                 </div>
               ))}

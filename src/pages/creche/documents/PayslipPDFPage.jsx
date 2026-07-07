@@ -1,34 +1,36 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockPayslips, mockEmployees } from "../../../data/mockEmployees.js";
-import { mockSettings } from "../../../data/mockSettings.js";
 import PrintLayout from "../../../components/shared/PrintLayout.jsx";
 
+// No standalone "GET payslip by id" endpoint exists on the backend, so this
+// page relies on payslip + employee being passed via navigation state from
+// EmployeeDetailPage's payslips tab (same approach as PayslipViewPage).
 export default function PayslipPDFPage() {
-  const { payslipId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
 
-  // TODO: replace with real API call -> apiClient.get(`/payslips/${payslipId}`)
-  const payslip = mockPayslips.find((p) => String(p.id) === payslipId);
-  const employee = payslip ? mockEmployees.find((e) => e.id === payslip.employeeId) : null;
+  const payslip = location.state?.payslip;
+  const employee = location.state?.employee;
 
   if (!payslip || !employee) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">{t("hr.notFound")}</p>
+        <button onClick={() => navigate(-1)} className="mt-3 text-teal-600 hover:underline text-sm">
+          ← {t("common.cancel")}
+        </button>
       </div>
     );
   }
 
-  const deductions = employee.salaireBase - payslip.net;
+  const deductions = (employee.salaire || 0) - (payslip.net || 0);
 
   return (
     <PrintLayout onClose={() => navigate(`/creche/hr/${employee.id}`)}>
       {/* Header */}
       <div className="text-center border-b border-gray-200 pb-6">
-        <h1 className="text-2xl font-bold text-gray-800">{mockSettings.nom}</h1>
-        <p className="text-sm text-gray-500">{mockSettings.adresse}</p>
+        <h1 className="text-2xl font-bold text-gray-800">{employee.creche || ""}</h1>
       </div>
 
       {/* Title */}
@@ -49,7 +51,7 @@ export default function PayslipPDFPage() {
       <div className="space-y-2 text-sm">
         <div className="flex justify-between py-2 border-b border-gray-100">
           <span className="text-gray-600">{t("hr.baseSalary")}</span>
-          <span className="font-medium text-gray-800">{employee.salaireBase.toLocaleString()} DZD</span>
+          <span className="font-medium text-gray-800">{(employee.salaire || 0).toLocaleString()} DZD</span>
         </div>
         <div className="flex justify-between py-2 border-b border-gray-100">
           <span className="text-gray-600">{t("docs.deductions")}</span>
@@ -57,7 +59,7 @@ export default function PayslipPDFPage() {
         </div>
         <div className="flex justify-between py-3 font-bold text-base">
           <span className="text-gray-800">{t("hr.netSalary")}</span>
-          <span className="text-teal-700">{payslip.net.toLocaleString()} DZD</span>
+          <span className="text-teal-700">{(payslip.net || 0).toLocaleString()} DZD</span>
         </div>
       </div>
 

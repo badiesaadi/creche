@@ -1,17 +1,48 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockChildren, mockChildExtras } from "../../../data/mockChildren.js";
-import { mockSettings } from "../../../data/mockSettings.js";
+import { fetchChild } from "../../../lib/api/children.js";
+import { fetchChildEvaluations } from "../../../lib/api/evaluations.js";
+import { fetchCreche } from "../../../lib/api/creches.js";
+import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 import PrintLayout from "../../../components/shared/PrintLayout.jsx";
 
 export default function EvaluationReportPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user } = useAuth();
 
-  // TODO: replace with real API call -> apiClient.get(`/children/${id}/evaluations`)
-  const child = mockChildren.find((c) => String(c.id) === id);
-  const evaluations = mockChildExtras[id]?.evaluations || [];
+  const [child, setChild] = useState(null);
+  const [evaluations, setEvaluations] = useState([]);
+  const [creche, setCreche] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetchChild(id),
+      fetchChildEvaluations(id).catch(() => []),
+      user?.crecheId ? fetchCreche(user.crecheId).catch(() => null) : Promise.resolve(null),
+    ])
+      .then(([childData, evals, crecheData]) => {
+        setChild(childData);
+        setEvaluations(
+          (Array.isArray(evals) ? evals : evals.items || []).map((e) => ({
+            domaine: e.criteria || e.domaine,
+            date: e.period || e.date,
+            note: e.score || e.note,
+            evaluePar: e.evaluatorName || e.evaluePar || "—",
+          }))
+        );
+        setCreche(crecheData);
+      })
+      .catch(() => setChild(null))
+      .finally(() => setLoading(false));
+  }, [id, user?.crecheId]);
+
+  if (loading) {
+    return <p className="text-gray-400 text-sm">{t("common.loading")}</p>;
+  }
 
   if (!child) {
     return (
@@ -25,8 +56,8 @@ export default function EvaluationReportPage() {
     <PrintLayout onClose={() => navigate(`/creche/enfants/${id}`)}>
       {/* Header */}
       <div className="text-center border-b border-gray-200 pb-6">
-        <h1 className="text-2xl font-bold text-gray-800">{mockSettings.nom}</h1>
-        <p className="text-sm text-gray-500">{mockSettings.adresse}</p>
+        <h1 className="text-2xl font-bold text-gray-800">{creche?.nom || ""}</h1>
+        <p className="text-sm text-gray-500">{creche?.adresse || ""}</p>
       </div>
 
       {/* Title */}

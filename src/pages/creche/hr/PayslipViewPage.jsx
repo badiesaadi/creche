@@ -1,20 +1,26 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockPayslips, mockEmployees } from "../../../data/mockEmployees.js";
 
 export default function PayslipViewPage() {
   const { payslipId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
 
-  // TODO: replace with real API call -> apiClient.get(`/payslips/${payslipId}`)
-  const payslip = mockPayslips.find((p) => String(p.id) === payslipId);
-  const employee = payslip ? mockEmployees.find((e) => e.id === payslip.employeeId) : null;
+  // The backend has no standalone "GET payslip by id" endpoint — payslips
+  // are only ever returned nested under an employee. So this page relies on
+  // the payslip + employee being passed via navigation state from
+  // EmployeeDetailPage's payslips tab.
+  const payslip = location.state?.payslip;
+  const employee = location.state?.employee;
 
   if (!payslip || !employee) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">{t("hr.notFound")}</p>
+        <button onClick={() => navigate(-1)} className="mt-3 text-teal-600 hover:underline text-sm">
+          ← {t("common.cancel")}
+        </button>
       </div>
     );
   }
@@ -53,7 +59,7 @@ export default function PayslipViewPage() {
         <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">{t("hr.baseSalary")}</span>
-            <span className="text-gray-800">{employee.salaireBase.toLocaleString()} DZD</span>
+            <span className="text-gray-800">{(employee.salaire || 0).toLocaleString()} DZD</span>
           </div>
           <div className="flex justify-between font-semibold border-t border-gray-100 pt-2">
             <span className="text-gray-700">{t("hr.netSalary")}</span>

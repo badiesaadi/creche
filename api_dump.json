@@ -1,0 +1,696 @@
+[
+  {
+    "path": "/absences",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تسجيل الغياب بنجاح"
+    }
+  },
+  {
+    "path": "/absences/bulk",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تسجيل الغياب بنجاح"
+    }
+  },
+  {
+    "path": "/absences/child/{childId}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/absences/{id}",
+    "method": "DELETE",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/admin/bonus",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/admin/charges",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/admin/charges",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/admin/charges/{id}",
+    "method": "PATCH",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/admin/children",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/admin/dashboard",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/admin/employees",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/admin/financial",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/admin/reports",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/auth/change-password",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تغيير كلمة المرور بنجاح"
+    }
+  },
+  {
+    "path": "/auth/login",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تسجيل الدخول بنجاح",
+      "data": {
+        "user": {
+          "id": "uuid",
+          "name": "Super Admin",
+          "email": "admin@creche.dz",
+          "role": "ADMIN"
+        },
+        "accessToken": "eyJ...",
+        "refreshToken": "uuid"
+      }
+    }
+  },
+  {
+    "path": "/auth/logout",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تسجيل الخروج بنجاح"
+    }
+  },
+  {
+    "path": "/auth/me",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/auth/refresh",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/auth/reset-password",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تغيير كلمة المرور بنجاح"
+    }
+  },
+  {
+    "path": "/children",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/children",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تسجيل الطفل بنجاح"
+    }
+  },
+  {
+    "path": "/children/{id}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/children/{id}",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث بيانات الطفل بنجاح"
+    }
+  },
+  {
+    "path": "/children/{id}/all",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/children/{id}/documents/{documentId}",
+    "method": "PATCH",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/children/{id}/exit",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم أرشفة ملف الطفل بنجاح"
+    }
+  },
+  {
+    "path": "/children/{id}/restore",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث بيانات الطفل بنجاح"
+    }
+  },
+  {
+    "path": "/classes",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/classes",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إنشاء القسم بنجاح"
+    }
+  },
+  {
+    "path": "/classes/{id}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/classes/{id}",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث القسم بنجاح"
+    }
+  },
+  {
+    "path": "/classes/{id}",
+    "method": "DELETE",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/classes/{id}/delete",
+    "method": "DELETE",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/classes/{id}/split",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "القسم ممتلئ، سيتم إنشاء مجموعة جديدة"
+    }
+  },
+  {
+    "path": "/creches",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/creches",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إنشاء الحضانة بنجاح"
+    }
+  },
+  {
+    "path": "/creches/responsable/{userId}/restore",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث الحضانة بنجاح"
+    }
+  },
+  {
+    "path": "/creches/{id}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/creches/{id}",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث الحضانة بنجاح"
+    }
+  },
+  {
+    "path": "/creches/{id}/activate",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تفعيل الحضانة"
+    }
+  },
+  {
+    "path": "/creches/{id}/assign-responsable",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/creches/{id}/assign-responsable",
+    "method": "PATCH",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/creches/{id}/deactivate",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تعطيل الحضانة"
+    }
+  },
+  {
+    "path": "/documents/contract",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إنشاء الوثيقة بنجاح"
+    }
+  },
+  {
+    "path": "/documents/enrollment-certificate",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إنشاء الوثيقة بنجاح",
+      "data": {
+        "url": "http://localhost:3000/uploads/certificates/enrollment_uuid.pdf"
+      }
+    }
+  },
+  {
+    "path": "/documents/payslip",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إنشاء الوثيقة بنجاح"
+    }
+  },
+  {
+    "path": "/documents/report-card",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/documents/upload/{folder}",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إنشاء الوثيقة بنجاح",
+      "data": {
+        "url": "http://localhost:3000/uploads/general/uuid_filename.pdf"
+      }
+    }
+  },
+  {
+    "path": "/documents/work-certificate",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/employees",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/employees",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إضافة الموظف بنجاح"
+    }
+  },
+  {
+    "path": "/employees/{id}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/employees/{id}",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث بيانات الموظف بنجاح"
+    }
+  },
+  {
+    "path": "/employees/{id}",
+    "method": "DELETE",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/employees/{id}/absences",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تسجيل الغياب بنجاح"
+    }
+  },
+  {
+    "path": "/employees/{id}/all",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/employees/{id}/assign-group",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/employees/{id}/assign-group",
+    "method": "PATCH",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/employees/{id}/contracts",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/employees/{id}/delete",
+    "method": "DELETE",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/employees/{id}/payslips",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إنشاء الوثيقة بنجاح"
+    }
+  },
+  {
+    "path": "/employees/{id}/restore",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث بيانات الموظف بنجاح"
+    }
+  },
+  {
+    "path": "/employees/{id}/unassign-group",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/employees/{id}/unassign-group",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/evaluations",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم حفظ التقييم بنجاح"
+    }
+  },
+  {
+    "path": "/evaluations/child/{childId}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/evaluations/group/{groupId}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/evaluations/{id}",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث التقييم بنجاح"
+    }
+  },
+  {
+    "path": "/evaluations/{id}",
+    "method": "DELETE",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/groups",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم إنشاء المجموعة بنجاح"
+    }
+  },
+  {
+    "path": "/groups/{id}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/groups/{id}",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث المجموعة بنجاح"
+    }
+  },
+  {
+    "path": "/groups/{id}/assign",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث المجموعة بنجاح",
+      "data": {
+        "autoCreated": false
+      }
+    }
+  },
+  {
+    "path": "/groups/{id}/assign",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث المجموعة بنجاح",
+      "data": {
+        "autoCreated": false
+      }
+    }
+  },
+  {
+    "path": "/groups/{id}/children/{childId}",
+    "method": "DELETE",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/groups/{id}/teacher",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث بيانات الموظف بنجاح"
+    }
+  },
+  {
+    "path": "/notifications",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/notifications",
+    "method": "POST",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/notifications/read-all",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديد الإشعار كمقروء"
+    }
+  },
+  {
+    "path": "/notifications/{id}",
+    "method": "DELETE",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم الحذف بنجاح"
+    }
+  },
+  {
+    "path": "/notifications/{id}/read",
+    "method": "PATCH",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/payments/child/{childId}",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/payments/dashboard",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/payments/late",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/payments/schedule",
+    "method": "POST",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تسجيل الدفعة بنجاح"
+    }
+  },
+  {
+    "path": "/payments/{id}",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث الدفعة بنجاح"
+    }
+  },
+  {
+    "path": "/settings",
+    "method": "GET",
+    "request": null,
+    "response": null
+  },
+  {
+    "path": "/settings",
+    "method": "PATCH",
+    "request": null,
+    "response": {
+      "success": true,
+      "message": "تم تحديث إعدادات الحضانة بنجاح"
+    }
+  }
+]

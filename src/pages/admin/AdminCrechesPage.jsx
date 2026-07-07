@@ -1,17 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockCrecheNetwork } from "../../data/mockAdmin.js";
+import { fetchCreches, activateCreche, deactivateCreche } from "../../lib/api/creches.js";
 
 export default function AdminCrechesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [creches, setCreches] = useState(mockCrecheNetwork);
+  const [creches, setCreches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  function toggleStatus(id) {
-    setCreches((prev) =>
-      prev.map((c) => c.id === id ? { ...c, statut: c.statut === "active" ? "inactive" : "active" } : c)
-    );
+  useEffect(() => {
+    fetchCreches()
+      .then(setCreches)
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }, [t]);
+
+  async function toggleStatus(c) {
+    try {
+      const updated = c.statut === "active" ? await deactivateCreche(c.id) : await activateCreche(c.id);
+      setCreches((prev) => prev.map((x) => (x.id === c.id ? updated : x)));
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
   }
 
   return (
@@ -25,6 +37,9 @@ export default function AdminCrechesPage() {
           + {t("admin.addCreche")}
         </button>
       </div>
+
+      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+      {loading && <p className="text-gray-400 text-sm">{t("common.loading")}</p>}
 
       <div className="space-y-3">
         {creches.map((c) => (
@@ -40,7 +55,7 @@ export default function AdminCrechesPage() {
               <p className="text-xs text-gray-400 mt-1">{t("admin.manager")}: {c.manager} · {c.enfantsCount} {t("admin.children")}</p>
             </div>
             <button
-              onClick={() => toggleStatus(c.id)}
+              onClick={() => toggleStatus(c)}
               className={`w-full sm:w-auto px-4 py-2 rounded-md text-sm font-medium border ${
                 c.statut === "active" ? "border-red-300 text-red-600 hover:bg-red-50" : "border-green-300 text-green-600 hover:bg-green-50"
               }`}

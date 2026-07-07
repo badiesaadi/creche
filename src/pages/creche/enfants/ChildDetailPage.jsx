@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { mockChildren, mockChildExtras } from "../../../data/mockChildren.js";
+import { fetchChild, fetchChildFull, restoreChild, updateChildDocument } from "../../../lib/api/children.js";
+import { paymentFromApi } from "../../../lib/api/adapters.js";
+import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 
-const tabs = ["profile", "payments", "absences", "evaluations"];
+const tabs = ["profile", "documents", "payments", "absences", "evaluations"];
 
 const statusStyles = {
   actif: "bg-green-50 text-green-700",
@@ -11,19 +13,96 @@ const statusStyles = {
   retire: "bg-gray-100 text-gray-500",
 };
 
+// The backend's /children/{id}/all shape isn't pinned down by the spec's
+// examples, so we read a few likely key names defensively.
+function extrasFromApi(data) {
+  const payments = (data.payments || []).map(paymentFromApi);
+  const absences = (data.absences || []).map((a) => ({
+    id: a.id,
+    date: a.date,
+    motif: a.reason || a.motif || "",
+    justifie: a.justified ?? a.justifie ?? false,
+  }));
+  const evaluations = (data.evaluations || []).map((e) => ({
+    id: e.id,
+    domaine: e.criteria || e.domaine,
+    date: e.period || e.date,
+    note: e.score || e.note,
+    evaluePar: e.evaluatorName || e.evaluePar || "—",
+  }));
+  const documents = (data.documents || []).map((d) => ({
+    id: d.id,
+    type: d.type,
+    isProvided: !!d.isProvided,
+  }));
+  return { payments, absences, evaluations, documents };
+}
+
 export default function ChildDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const isManager = user?.role === "manager";
   const [activeTab, setActiveTab] = useState("profile");
+  const [child, setChild] = useState(null);
+  const [extras, setExtras] = useState({ payments: [], absences: [], evaluations: [], documents: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [restoring, setRestoring] = useState(false);
 
-  // TODO: replace with real API call -> apiClient.get(`/children/${id}`)
-  const child = mockChildren.find((c) => String(c.id) === id);
-  const extras = mockChildExtras[id] || { payments: [], absences: [], evaluations: [] };
+  function load() {
+    setLoading(true);
+    return Promise.all([
+      fetchChild(id),
+      fetchChildFull(id).catch(() => ({})),
+    ])
+      .then(([childData, fullData]) => {
+        setChild(childData);
+        setExtras(extrasFromApi(fullData || {}));
+      })
+      .catch((err) => setError(err.response?.data?.message || t("common.error")))
+      .finally(() => setLoading(false));
+  }
 
-  if (!child) {
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  async function handleRestore() {
+    setRestoring(true);
+    try {
+      await restoreChild(id);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    } finally {
+      setRestoring(false);
+    }
+  }
+
+  async function handleToggleDocument(doc) {
+    if (!isManager) return;
+    try {
+      await updateChildDocument(id, doc.id, { isProvided: !doc.isProvided });
+      setExtras((prev) => ({
+        ...prev,
+        documents: prev.documents.map((d) => (d.id === doc.id ? { ...d, isProvided: !d.isProvided } : d)),
+      }));
+    } catch (err) {
+      setError(err.response?.data?.message || t("common.error"));
+    }
+  }
+
+  if (loading) {
+    return <p className="text-gray-400 text-sm">{t("common.loading")}</p>;
+  }
+
+  if (error || !child) {
     return (
       <div className="text-center py-12">
+        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2 mb-3 inline-block">{error}</p>}
         <p className="text-gray-500">{t("children.notFound")}</p>
         <button onClick={() => navigate("/creche/enfants")} className="mt-3 text-teal-600 hover:underline text-sm">
           ← {t("common.cancel")}
@@ -49,18 +128,35 @@ export default function ChildDetailPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
+          {isManager && child.statut !== "retire" && (
+            <button
+              onClick={() => navigate(`/creche/enfants/${id}/modifier`)}
+              className="w-full sm:w-auto px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
+            >
+              {t("common.edit")}
+            </button>
+          )}
           <button
             onClick={() => navigate(`/creche/enfants/${id}/certificat`)}
             className="w-full sm:w-auto px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
           >
             {t("docs.certificate")}
           </button>
-          {child.statut !== "retire" && (
+          {isManager && child.statut !== "retire" && (
             <button
               onClick={() => navigate(`/creche/enfants/${id}/sortie`)}
               className="w-full sm:w-auto px-4 py-2 rounded-md border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50"
             >
               {t("children.withdraw")}
+            </button>
+          )}
+          {isManager && child.statut === "retire" && (
+            <button
+              onClick={handleRestore}
+              disabled={restoring}
+              className="w-full sm:w-auto px-4 py-2 rounded-md border border-teal-300 text-teal-700 text-sm font-medium hover:bg-teal-50 disabled:opacity-50"
+            >
+              {restoring ? t("common.loading") : t("children.restore")}
             </button>
           )}
         </div>
@@ -87,6 +183,9 @@ export default function ChildDetailPage() {
 
       {/* Tab content */}
       {activeTab === "profile" && <ProfileTab child={child} t={t} />}
+      {activeTab === "documents" && (
+        <DocumentsTab documents={extras.documents} onToggle={handleToggleDocument} isManager={isManager} t={t} />
+      )}
       {activeTab === "payments" && <PaymentsTab payments={extras.payments} t={t} />}
       {activeTab === "absences" && <AbsencesTab absences={extras.absences} t={t} />}
       {activeTab === "evaluations" && (
@@ -119,6 +218,29 @@ function InfoRow({ label, value }) {
     <div>
       <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">{label}</p>
       <p className="text-gray-800 font-medium">{value || "—"}</p>
+    </div>
+  );
+}
+
+function DocumentsTab({ documents, onToggle, isManager, t }) {
+  if (documents.length === 0) return <EmptyState text={t("children.noDocuments")} />;
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-2">
+      {documents.map((doc) => (
+        <label
+          key={doc.id}
+          className={`flex items-center gap-3 px-3 py-2 rounded-md ${isManager ? "hover:bg-gray-50 cursor-pointer" : "cursor-default"}`}
+        >
+          <input
+            type="checkbox"
+            checked={doc.isProvided}
+            disabled={!isManager}
+            onChange={() => onToggle(doc)}
+            className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 disabled:opacity-50"
+          />
+          <span className="text-sm text-gray-700">{doc.type}</span>
+        </label>
+      ))}
     </div>
   );
 }

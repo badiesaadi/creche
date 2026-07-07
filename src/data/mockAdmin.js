@@ -84,3 +84,13 @@ export const mockNetworkChildren = [
   { id: 5, nom: "Hamdi", prenom: "Rania", creche: "Oran", crecheId: 2, dateInscription: "2025-02-15", assure: false },
   { id: 6, nom: "Khelifi", prenom: "Samir", creche: "Oran", crecheId: 2, dateInscription: "2025-03-01", assure: false },
 ];
+
+// REQ-025 — network-wide absence report (children + staff), used by AdminReportsPage.
+export const mockNetworkAbsences = [
+  { id: 1, categorie: "enfant", nom: "Yacine Ahmed", creche: "Mostaganem", date: "2025-11-03", mois: "Novembre 2025", motif: "Non précisé", justifie: false },
+  { id: 2, categorie: "enfant", nom: "Yacine Ahmed", creche: "Mostaganem", date: "2025-10-12", mois: "Octobre 2025", motif: "Maladie", justifie: true },
+  { id: 3, categorie: "enfant", nom: "Lina Belkacem", creche: "Mostaganem", date: "2025-11-05", mois: "Novembre 2025", motif: "Rendez-vous médical", justifie: true },
+  { id: 4, categorie: "enfant", nom: "Amir Bouzidi", creche: "Oran", date: "2025-11-06", mois: "Novembre 2025", motif: "Non précisé", justifie: false },
+  { id: 5, categorie: "personnel", nom: "Amine Belkacem", creche: "Mostaganem", date: "2025-11-04", mois: "Novembre 2025", motif: "Maladie", justifie: true },
+  { id: 6, categorie: "personnel", nom: "Yasmine Cherif", creche: "Mostaganem", date: "2025-10-20", mois: "Octobre 2025", motif: "Congé maternité", justifie: true },
+];
