@@ -13,8 +13,8 @@ const statusStyles = {
   retire: "bg-gray-100 text-gray-500",
 };
 
-// The backend's /children/{id}/all shape isn't pinned down by the spec's
-// examples, so we read a few likely key names defensively.
+// The full child record doesn't return a fixed set of fields, so we check
+// a few possible key names for each section.
 function extrasFromApi(data) {
   const payments = (data.payments || []).map(paymentFromApi);
   const absences = (data.absences || []).map((a) => ({

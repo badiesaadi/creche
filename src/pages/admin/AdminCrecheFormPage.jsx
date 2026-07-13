@@ -9,7 +9,7 @@ import { apiClient } from "../../lib/api/client.js";
 // L'administrateur peut créer une nouvelle crèche OU modifier une crèche
 // existante (nom, adresse, logo, responsable assigné, capacité).
 //
-// Backend contract (see Creche_Backend_API_openapi.json):
+// Backend contract:
 //   POST /creches   requires { name, address, phone, responsable: {name,email,password,phone} }
 //   PATCH /creches/:id  updates name/address/phone/logo only
 //   POST/PATCH /creches/:id/assign-responsable { userId }  reassigns an EXISTING manager

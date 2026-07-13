@@ -1,9 +1,8 @@
 // src/lib/api/documents.js
 //
-// All of these generate a document server-side and (per the spec description
-// "PDF URL returned") hand back a URL to it in `data`. We defensively read
-// a few likely shapes (`data.url`, `data.fileUrl`, or `data` being the URL
-// itself) since the spec doesn't pin down the exact field name.
+// These all generate a document server-side and return a URL to the file.
+// The response shape can vary slightly by endpoint, so we check a few
+// possible fields (`data.url`, `data.fileUrl`, or `data` itself as the URL).
 import { apiClient } from "./client.js";
 
 function extractUrl(data) {

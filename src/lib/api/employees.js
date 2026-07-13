@@ -45,7 +45,7 @@ export async function addPayslip(employeeId, period, bonuses = 0) {
 
 // Full history (contracts, absences, payslips...) for the employee detail page.
 export async function fetchEmployeeFull(id) {
-  const res = await apiClient.get(`/employees/${id}/all`);
+  const res = await apiClient.get(`/employees/${id}`, { params: { all: true } });
   return res.data.data;
 }
 
@@ -54,8 +54,13 @@ export async function restoreEmployee(id) {
   return employeeFromApi(res.data.data);
 }
 
-export async function addEmployeeAbsence(employeeId, date) {
-  const res = await apiClient.post(`/employees/${employeeId}/absences`, { date });
+export async function addEmployeeAbsence(employeeId, startDate, endDate = startDate, type = "CONGE", justification = "") {
+  const res = await apiClient.post(`/employees/${employeeId}/absences`, {
+    type,
+    startDate,
+    endDate,
+    ...(justification ? { justification } : {}),
+  });
   return res.data.data;
 }
 

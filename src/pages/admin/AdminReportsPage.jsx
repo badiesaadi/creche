@@ -22,9 +22,9 @@ function extractRevenueRows(data, crecheNameById) {
   })).filter((r) => r.mois);
 }
 
-// /admin/reports has no documented schema either — try to find a network-wide
-// absence list inside it. If the shape doesn't match, the absence report is
-// simply unavailable rather than fabricated.
+// /admin/reports doesn't return a fixed set of fields — try to find a
+// network-wide absence list inside it. If the shape doesn't match, the
+// absence report is simply unavailable rather than fabricated.
 function extractAbsenceRows(data, crecheNameById) {
   const rows = Array.isArray(data) ? data : data?.absences || data?.items;
   if (!Array.isArray(rows)) return [];
@@ -109,10 +109,12 @@ export default function AdminReportsPage() {
       ).join("");
       html = `<h2>${t("admin.report_monthlyFinance")}</h2><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><thead><tr><th>Crèche</th><th>Mois</th><th>Collecté</th><th>Charges</th><th>Net</th></tr></thead><tbody>${rows}</tbody></table>`;
     } else if (key === "childrenNetwork") {
-      const rows = filteredChildren.map((c) =>
-        `<tr><td>${c.prenom} ${c.nom}</td><td>${c.creche || ""}</td><td>${c.dateInscription || ""}</td></tr>`
-      ).join("");
-      html = `<h2>${t("admin.report_childrenNetwork")}</h2><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><thead><tr><th>Nom</th><th>Crèche</th><th>Inscription</th></tr></thead><tbody>${rows}</tbody></table>`;
+      const rows = filteredChildren.map((c) => {
+        const docCount = c.documents?.length || 0;
+        const docsProvided = c.documents?.filter((d) => d.isProvided).length || 0;
+        return `<tr><td>${docsProvided}/${docCount}</td><td>${c.prenom} ${c.nom}</td><td>${c.creche || ""}</td><td>${c.dateInscription || ""}</td></tr>`;
+      }).join("");
+      html = `<h2>${t("admin.report_childrenNetwork")}</h2><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><thead><tr><th>${t("children.tabDocuments")}</th><th>Nom</th><th>Crèche</th><th>Inscription</th></tr></thead><tbody>${rows}</tbody></table>`;
     } else if (key === "staffSummary") {
       const rows = filteredStaff.map((e) =>
         `<tr><td>${e.nom}</td><td>${e.creche || ""}</td><td>${e.poste || ""}</td><td>${(e.salaire || 0).toLocaleString()} DZD</td></tr>`
@@ -137,8 +139,12 @@ export default function AdminReportsPage() {
       const rows = filteredFinance.map((f) => [f.creche, f.mois, f.collected, f.pending, f.expenses, f.collected - f.expenses]);
       csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     } else if (key === "childrenNetwork") {
-      const headers = ["Prénom", "Nom", "Crèche", "Date Inscription"];
-      const rows = filteredChildren.map((c) => [c.prenom, c.nom, c.creche || "", c.dateInscription || ""]);
+      const headers = ["Documents fournis", "Prénom", "Nom", "Crèche", "Date Inscription"];
+      const rows = filteredChildren.map((c) => {
+        const docCount = c.documents?.length || 0;
+        const docsProvided = c.documents?.filter((d) => d.isProvided).length || 0;
+        return [`${docsProvided}/${docCount}`, c.prenom, c.nom, c.creche || "", c.dateInscription || ""];
+      });
       csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     } else if (key === "staffSummary") {
       const headers = ["Nom", "Crèche", "Poste", "Salaire", "Statut"];

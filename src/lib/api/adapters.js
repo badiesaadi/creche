@@ -1,6 +1,6 @@
 // src/lib/api/adapters.js
 //
-// The backend (Creche_Backend_API_openapi.json) uses English camelCase
+// The backend uses English camelCase
 // field names and UUIDs; every existing page/component in this app uses
 // French field names (nom, prenom, adresse...) and mock numeric ids.
 //
@@ -99,7 +99,7 @@ export function employeeToApi(form) {
   };
 }
 
-// PATCH /employees/{id} only accepts these fields per the backend spec —
+// PATCH /employees/{id} only accepts these fields on the backend —
 // salary/contract/position changes go through addContract() instead.
 export function employeeUpdateToApi(form) {
   const [firstName, ...rest] = form.nom.trim().split(" ");
@@ -159,7 +159,7 @@ export function childToApi(form) {
   };
 }
 
-// PATCH /children/{id} only accepts these 3 fields per the backend spec —
+// PATCH /children/{id} only accepts these 3 fields on the backend —
 // dateOfBirth, gender, groupId, and parents are NOT editable after enrollment.
 export function childUpdateToApi(form) {
   return {
@@ -191,6 +191,11 @@ export function childFromApi(apiChild) {
     assure: (apiChild.documents || []).some(
       (d) => /assurance/i.test(d.type || "") && d.isProvided
     ),
+    documents: (apiChild.documents || []).map((d) => ({
+      id: d.id,
+      type: d.type,
+      isProvided: !!d.isProvided,
+    })),
   };
 }
 
@@ -211,7 +216,7 @@ export function classFromApi(apiClass) {
     tranche: `${apiClass.minAge}-${apiClass.maxAge} ans`,
     seuilMax: apiClass.maxCapacity,
     // Present when the backend nests groups inside the class payload
-    // (there's no separate "list groups for a class" endpoint in the spec).
+    // (there's no separate "list groups for a class" endpoint).
     groups: (apiClass.groups || []).map(groupFromApi),
   };
 }

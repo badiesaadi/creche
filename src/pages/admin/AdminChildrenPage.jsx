@@ -14,6 +14,7 @@ export default function AdminChildrenPage() {
   const [crecheFilter, setCrecheFilter] = useState("toutes");
   const [insuranceFilter, setInsuranceFilter] = useState("tous");
   const [selected, setSelected] = useState([]);
+  const [docsChild, setDocsChild] = useState(null);
 
   useEffect(() => {
     Promise.all([fetchAdminChildren(), fetchCreches()])
@@ -153,6 +154,7 @@ export default function AdminChildrenPage() {
                 <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0}
                   onChange={toggleAll} className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500" />
               </th>
+              <th className="text-start px-4 py-3">{t("children.tabDocuments")}</th>
               <th className="text-start px-4 py-3">{t("children.fullName")}</th>
               <th className="text-start px-4 py-3">{t("admin.creche")}</th>
               <th className="text-start px-4 py-3">{t("children.enrollmentDate")}</th>
@@ -166,6 +168,16 @@ export default function AdminChildrenPage() {
                 <td className="px-4 py-3">
                   <input type="checkbox" checked={selected.includes(child.id)} onChange={() => toggleSelect(child.id)}
                     className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500" />
+                </td>
+                <td className="px-4 py-3">
+                  <button onClick={() => setDocsChild(child)}
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      child.documents?.length && child.documents.every((d) => d.isProvided)
+                        ? "bg-green-50 text-green-700"
+                        : "bg-yellow-50 text-yellow-700"
+                    } hover:opacity-80`}>
+                    {child.documents?.filter((d) => d.isProvided).length || 0}/{child.documents?.length || 0}
+                  </button>
                 </td>
                 <td className="px-4 py-3 font-medium text-gray-800">{child.prenom} {child.nom}</td>
                 <td className="px-4 py-3 text-gray-600">{child.creche}</td>
@@ -182,7 +194,7 @@ export default function AdminChildrenPage() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">{t("common.noResults")}</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">{t("common.noResults")}</td></tr>
             )}
           </tbody>
         </table>
@@ -197,6 +209,14 @@ export default function AdminChildrenPage() {
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={selected.includes(child.id)} onChange={() => toggleSelect(child.id)}
                   className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500" onClick={(e) => e.stopPropagation()} />
+                <button onClick={(e) => { e.stopPropagation(); setDocsChild(child); }}
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    child.documents?.length && child.documents.every((d) => d.isProvided)
+                      ? "bg-green-50 text-green-700"
+                      : "bg-yellow-50 text-yellow-700"
+                  }`}>
+                  📄 {child.documents?.filter((d) => d.isProvided).length || 0}/{child.documents?.length || 0}
+                </button>
                 <span className="font-medium text-gray-800">{child.prenom} {child.nom}</span>
               </div>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${child.assure ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
@@ -208,6 +228,33 @@ export default function AdminChildrenPage() {
         ))}
         {filtered.length === 0 && <p className="text-center text-gray-400 py-8">{t("common.noResults")}</p>}
       </div>
+
+      {/* Documents modal — read-only for admin; only Responsable can update document status */}
+      {docsChild && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setDocsChild(null)}>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-800">{docsChild.prenom} {docsChild.nom}</h2>
+              <button onClick={() => setDocsChild(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            {docsChild.documents?.length > 0 ? (
+              <div className="space-y-2">
+                {docsChild.documents.map((d) => (
+                  <div key={d.id} className="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-50">
+                    <span className={`w-4 h-4 rounded-sm flex items-center justify-center text-xs ${d.isProvided ? "bg-green-500 text-white" : "bg-gray-200"}`}>
+                      {d.isProvided ? "✓" : ""}
+                    </span>
+                    <span className="text-sm text-gray-700">{d.type}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">{t("children.noDocuments")}</p>
+            )}
+            <p className="text-xs text-gray-400">{t("admin.documentsReadOnlyHint")}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

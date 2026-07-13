@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { fetchEmployee, fetchEmployeeFull, restoreEmployee, deleteEmployee, addEmployeeAbsence } from "../../../lib/api/employees.js";
+import { fetchEmployee, fetchEmployeeFull, restoreEmployee, deleteEmployee, addEmployeeAbsence, addPayslip, addContract } from "../../../lib/api/employees.js";
+import { generateWorkCertificate } from "../../../lib/api/documents.js";
 import { useAuth } from "../../../lib/auth/AuthContext.jsx";
 
 const tabs = ["profile", "contract", "absences", "payslips"];
 
-// The backend's /employees/{id}/all shape isn't pinned down by the spec's
-// examples, so we read a few likely key names defensively.
+// The full employee record doesn't return a fixed set of fields, so we
+// check a few possible key names for each section.
 function extrasFromApi(data) {
   const absences = (data.absences || []).map((a) => ({
     id: a.id,
@@ -21,7 +22,18 @@ function extrasFromApi(data) {
     net: p.netAmount ?? p.net ?? 0,
     statut: p.validated || p.statut === "valide" ? "valide" : "en_attente",
   }));
-  return { absences, payslips };
+  const contracts = (data.contracts || [])
+    .map((c) => ({
+      id: c.id,
+      type: c.type,
+      poste: c.position || c.poste,
+      salaire: c.baseSalary ?? c.salaire ?? 0,
+      dateDebut: c.startDate || c.dateDebut,
+      dateFin: c.endDate || c.dateFin || null,
+    }))
+    // Most recent contract first (by start date), so the newest one added shows as "current".
+    .sort((a, b) => (b.dateDebut || "").localeCompare(a.dateDebut || ""));
+  return { absences, payslips, contracts };
 }
 
 export default function EmployeeDetailPage() {
@@ -33,7 +45,7 @@ export default function EmployeeDetailPage() {
   const [activeTab, setActiveTab] = useState("profile");
 
   const [employee, setEmployee] = useState(null);
-  const [extras, setExtras] = useState({ absences: [], payslips: [] });
+  const [extras, setExtras] = useState({ absences: [], payslips: [], contracts: [] });
   const [loading, setLoading] = useState(true);
   const [actionError, setActionError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -81,6 +93,62 @@ export default function EmployeeDetailPage() {
     }
   }
 
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [contractForm, setContractForm] = useState({ poste: "", type: "CDI", dateDebut: new Date().toISOString().slice(0, 10), dateFin: "", salaire: "" });
+
+  async function handleGeneratePayslip() {
+    setBusy(true);
+    setActionError("");
+    try {
+      await addPayslip(id, new Date().toISOString().slice(0, 7));
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.message || t("common.error"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleOpenContractModal() {
+    setContractForm({
+      poste: employee?.poste || "",
+      type: "CDI",
+      dateDebut: new Date().toISOString().slice(0, 10),
+      dateFin: "",
+      salaire: employee?.salaire || "",
+    });
+    setShowContractModal(true);
+  }
+
+  async function handleSubmitContract(ev) {
+    ev.preventDefault();
+    if (!contractForm.poste.trim() || !contractForm.dateDebut || !contractForm.salaire) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      await addContract(id, contractForm);
+      setShowContractModal(false);
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.message || t("common.error"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleWorkCertificate() {
+    setActionError("");
+    try {
+      const url = await generateWorkCertificate(id);
+      if (url) {
+        window.open(url, "_blank");
+        return;
+      }
+    } catch (err) {
+      setActionError(err.response?.data?.message || t("common.error"));
+    }
+  }
+
   async function handleRecordAbsence() {
     setBusy(true);
     setActionError("");
@@ -94,7 +162,13 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  const contract = employee
+  // Prefer the most recent contract from the full history (?all=true) — the base
+  // GET /employees/{id} record only reflects the original hire-time contract and
+  // doesn't update after adding a new one via POST /employees/{id}/contracts.
+  const latestContract = extras.contracts[0];
+  const contract = latestContract
+    ? { ...latestContract, document: null }
+    : employee
     ? {
         type: employee.contratType,
         dateDebut: employee.dateEmbauche,
@@ -103,6 +177,7 @@ export default function EmployeeDetailPage() {
         document: null,
       }
     : null;
+  const contractHistory = extras.contracts;
   const absences = extras.absences;
   const payslips = extras.payslips;
 
@@ -122,6 +197,7 @@ export default function EmployeeDetailPage() {
   }
 
   return (
+    <>
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -151,6 +227,10 @@ export default function EmployeeDetailPage() {
                 <button onClick={handleRecordAbsence} disabled={busy}
                   className="w-full sm:w-auto px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
                   {t("hr.recordAbsence")}
+                </button>
+                <button onClick={handleWorkCertificate}
+                  className="w-full sm:w-auto px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
+                  {t("admin.workCertificate")}
                 </button>
                 <button onClick={handleDeactivate} disabled={busy}
                   className="w-full sm:w-auto px-4 py-2 rounded-md border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50">
@@ -189,10 +269,60 @@ export default function EmployeeDetailPage() {
       </div>
 
       {activeTab === "profile" && <ProfileTab employee={employee} t={t} />}
-      {activeTab === "contract" && <ContractTab contract={contract} t={t} isManager={isManager} id={id} navigate={navigate} />}
+      {activeTab === "contract" && <ContractTab contract={contract} history={contractHistory} t={t} isManager={isManager} id={id} navigate={navigate} onOpenContractModal={handleOpenContractModal} />}
       {activeTab === "absences" && <AbsencesTab absences={absences} t={t} />}
-      {activeTab === "payslips" && <PayslipsTab payslips={payslips} t={t} navigate={navigate} employee={employee} />}
+      {activeTab === "payslips" && <PayslipsTab payslips={payslips} t={t} navigate={navigate} employee={employee} isManager={isManager} onGeneratePayslip={handleGeneratePayslip} busy={busy} />}
     </div>
+
+      {/* Add contract modal */}
+      {showContractModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleSubmitContract} className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+            <h2 className="font-semibold text-gray-800">{t("hr.updateContract")}</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t("hr.position")}</label>
+              <input type="text" value={contractForm.poste} onChange={(e) => setContractForm((p) => ({ ...p, poste: e.target.value }))} required
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("hr.contractType")}</label>
+                <select value={contractForm.type} onChange={(e) => setContractForm((p) => ({ ...p, type: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                  <option value="CDI">CDI</option>
+                  <option value="CDD">CDD</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("hr.salary")} (DZD)</label>
+                <input type="number" value={contractForm.salaire} onChange={(e) => setContractForm((p) => ({ ...p, salaire: e.target.value }))} required
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("hr.startDate")}</label>
+                <input type="date" value={contractForm.dateDebut} onChange={(e) => setContractForm((p) => ({ ...p, dateDebut: e.target.value }))} required
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("hr.endDate")}</label>
+                <input type="date" value={contractForm.dateFin} onChange={(e) => setContractForm((p) => ({ ...p, dateFin: e.target.value }))}
+                  disabled={contractForm.type === "CDI"}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-50" />
+              </div>
+            </div>
+            {actionError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">{actionError}</p>}
+            <div className="flex gap-3 justify-end">
+              <button type="button" onClick={() => setShowContractModal(false)}
+                className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 text-sm hover:bg-gray-50">{t("common.cancel")}</button>
+              <button type="submit" disabled={busy}
+                className="px-4 py-2 rounded-md bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 disabled:opacity-50">{t("common.save")}</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -219,34 +349,50 @@ function InfoRow({ label, value }) {
   );
 }
 
-function ContractTab({ contract, t, isManager, id, navigate }) {
+function ContractTab({ contract, history, t, isManager, id, navigate, onOpenContractModal }) {
   if (!contract) return <EmptyState text={t("hr.noContract")} />;
+  const olderContracts = history?.slice(1) || [];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm">
-        <InfoRow label={t("hr.contractType")} value={contract.type} />
-        <InfoRow label={t("hr.startDate")} value={contract.dateDebut} />
-        <InfoRow label={t("hr.endDate")} value={contract.dateFin || t("hr.indefinite")} />
-        <InfoRow label={t("hr.salary")} value={`${contract.salaire.toLocaleString()} DZD`} />
-      </div>
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-sm">
+          <InfoRow label={t("hr.contractType")} value={contract.type} />
+          <InfoRow label={t("hr.startDate")} value={contract.dateDebut} />
+          <InfoRow label={t("hr.endDate")} value={contract.dateFin || t("hr.indefinite")} />
+          <InfoRow label={t("hr.salary")} value={`${(contract.salaire || 0).toLocaleString()} DZD`} />
+        </div>
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-t border-gray-100 pt-4 gap-3">
-        <span className="text-sm text-gray-600">{contract.document}</span>
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate(`/creche/hr/${id}/contrat`)}
-            className="text-sm text-teal-600 hover:underline"
-          >
-            {t("docs.printContract")}
-          </button>
-          {isManager && (
-            <button className="text-sm text-gray-500 hover:text-gray-700">
-              {t("hr.updateContract")}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-t border-gray-100 pt-4 gap-3">
+          <span className="text-sm text-gray-600">{contract.document}</span>
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate(`/creche/hr/${id}/contrat`)}
+              className="text-sm text-teal-600 hover:underline"
+            >
+              {t("docs.printContract")}
             </button>
-          )}
+            {isManager && (
+              <button onClick={onOpenContractModal} className="text-sm text-gray-500 hover:text-gray-700">
+                {t("hr.updateContract")}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {olderContracts.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-400 uppercase tracking-wide">{t("hr.contractHistory")}</p>
+          {olderContracts.map((c) => (
+            <div key={c.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 text-sm text-gray-600 flex items-center justify-between">
+              <span>{c.type} · {c.poste}</span>
+              <span>{c.dateDebut} → {c.dateFin || t("hr.indefinite")}</span>
+              <span>{(c.salaire || 0).toLocaleString()} DZD</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -275,10 +421,18 @@ function AbsencesTab({ absences, t }) {
   );
 }
 
-function PayslipsTab({ payslips, t, navigate, employee }) {
-  if (payslips.length === 0) return <EmptyState text={t("hr.noPayslips")} />;
+function PayslipsTab({ payslips, t, navigate, employee, isManager, onGeneratePayslip, busy }) {
   return (
     <div className="space-y-3">
+      {isManager && (
+        <div className="flex justify-end">
+          <button onClick={onGeneratePayslip} disabled={busy}
+            className="px-3 py-1.5 rounded-md bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
+            {busy ? t("common.loading") : t("hr.generatePayslip")}
+          </button>
+        </div>
+      )}
+      {payslips.length === 0 && <EmptyState text={t("hr.noPayslips")} />}
       {payslips.map((p) => (
         <div
           key={p.id}

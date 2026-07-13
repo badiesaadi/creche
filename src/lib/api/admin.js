@@ -23,8 +23,9 @@ export async function fetchAdminEmployees({ crecheId, isActive } = {}) {
   return res.data.data.map(employeeFromApi);
 }
 
-export async function fetchAdminReports() {
-  const res = await apiClient.get("/admin/reports");
+// month: "YYYY-MM", crecheId: optional filter
+export async function fetchAdminReports({ month, crecheId } = {}) {
+  const res = await apiClient.get("/admin/reports", { params: { month, crecheId } });
   return res.data.data;
 }
 

@@ -4,10 +4,9 @@ import { useTranslation } from "react-i18next";
 import { fetchCreches } from "../../lib/api/creches.js";
 import { fetchAdminDashboard, fetchAdminFinancial } from "../../lib/api/admin.js";
 
-// The spec only documents /admin/dashboard and /admin/financial as a generic
-// "SuccessResponse" with no field-level schema, so we read several likely key
-// names defensively and fall back to "—" rather than guessing wrong and
-// silently showing fabricated numbers.
+// /admin/dashboard and /admin/financial don't return a fixed set of fields,
+// so we check a few possible key names and fall back to "—" rather than
+// showing fabricated numbers.
 function pick(obj, ...keys) {
   for (const k of keys) {
     if (obj?.[k] !== undefined && obj?.[k] !== null) return obj[k];

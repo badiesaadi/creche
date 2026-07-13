@@ -12,10 +12,9 @@ function pick(obj, ...keys) {
   return null;
 }
 
-// /admin/financial has no documented field-level schema (generic SuccessResponse).
-// We try to normalize a per-creche/per-month revenue breakdown defensively;
-// if the shape doesn't match, we show real expense data only rather than
-// fabricate revenue numbers.
+// We try to normalize a per-creche/per-month revenue breakdown from whatever
+// shape the backend returns; if it doesn't match, we show real expense data
+// only rather than fabricate revenue numbers.
 function extractRevenueRows(data, crecheNameById) {
   const rows = Array.isArray(data) ? data : data?.byMonth || data?.rows || data?.items;
   if (!Array.isArray(rows)) return [];
